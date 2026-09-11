@@ -89,9 +89,9 @@ export class PlayCommand extends ContextCommand {
             return handleVideos(client, localCtx, toQueue, voiceChannel);
         }
 
-        const audioAttachment = ctx.isMessage()
-            ? ctx.context.attachments.find((a) => a.contentType?.startsWith("audio/"))
-            : undefined;
+        const audioAttachment = ctx.isInteraction()
+            ? undefined
+            : ctx.context.attachments.find((a) => a.contentType?.startsWith("audio/"));
         const query =
             (localCtx.args.join(" ") ||
                 localCtx.options?.getString("query") ||
