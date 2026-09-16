@@ -21,6 +21,7 @@ interface DatabaseExport {
     name: "db-import",
     aliases: ["database-import", "import-db", "dbimport"],
     description: i18n.__("commands.developers.dbImport.description"),
+    devOnly: true,
     preconditions: ["DevOnly"],
     cooldownDelay: 0,
     detailedDescription: {

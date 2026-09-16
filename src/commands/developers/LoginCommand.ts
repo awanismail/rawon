@@ -18,6 +18,7 @@ import { i18n__, i18n__mf } from "../../utils/functions/i18n.js";
     detailedDescription: {
         usage: i18n.__("commands.developers.login.usage"),
     },
+    devOnly: true,
     preconditions: ["DevOnly"],
     cooldownDelay: 5000,
     requiredClientPermissions: [

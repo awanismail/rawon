@@ -16,7 +16,7 @@ import { BOT_SETTINGS_DEFAULTS } from "../../utils/structures/SQLiteDataManager.
     aliases: ["config", "settings"],
     description: i18n.__("commands.developers.setup.description"),
     detailedDescription: { usage: i18n.__("commands.developers.setup.usage") },
-    devOnly: true,
+    devOrGuildOwner: true,
     requiredClientPermissions: [
         PermissionFlagsBits.ViewChannel,
         PermissionFlagsBits.SendMessages,

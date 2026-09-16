@@ -22,6 +22,7 @@ const EXPORT_VERSION = "1.0.0";
     name: "db-export",
     aliases: ["database-export", "export-db", "dbexport"],
     description: i18n.__("commands.developers.dbExport.description"),
+    devOnly: true,
     preconditions: ["DevOnly"],
     cooldownDelay: 0,
     requiredClientPermissions: [

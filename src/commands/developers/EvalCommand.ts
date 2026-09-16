@@ -15,6 +15,7 @@ import { i18n__ } from "../../utils/functions/i18n.js";
     aliases: ["evaluate", "ev", "js-exec"],
     description: i18n.__("commands.developers.eval.description"),
     detailedDescription: { usage: i18n.__("commands.developers.eval.usage") },
+    devOnly: true,
     preconditions: ["DevOnly"],
     cooldownDelay: 0,
     requiredClientPermissions: [
