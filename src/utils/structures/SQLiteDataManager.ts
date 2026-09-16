@@ -21,7 +21,10 @@ export class SQLiteDataManager<T extends Record<string, GuildData> = Record<stri
     private readonly manager = new OperationManager();
     private _data: T | null = null;
 
-    public constructor(public readonly dbPath: string) {
+    public readonly dbPath: string;
+
+    public constructor(dbPath: string) {
+        this.dbPath = dbPath;
         this.ensureDirectory();
         this.db = new Database(this.dbPath, {
             verbose: undefined,
@@ -804,6 +807,7 @@ export class SQLiteDataManager<T extends Record<string, GuildData> = Record<stri
             "default_volume",
             "music_selection_type",
             "enable_audio_cache",
+            "always_on",
         ]);
 
         if (!validColumns.has(key)) {
