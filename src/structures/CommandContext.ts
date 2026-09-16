@@ -318,6 +318,22 @@ export class CommandContext {
         return this.context instanceof BaseInteraction;
     }
 
+    public isMessage(): this is this & { context: Message } {
+        return this.context instanceof Message;
+    }
+
+    public isMessageContext(): boolean {
+        return this.context instanceof Message;
+    }
+
+    public isChatInputInteractionContext(): boolean {
+        return (
+            this.context instanceof CommandInteraction &&
+            typeof (this.context as any).isChatInputCommand === "function" &&
+            (this.context as any).isChatInputCommand()
+        );
+    }
+
     public isCommandInteraction(): boolean {
         return (
             this.context instanceof CommandInteraction ||
