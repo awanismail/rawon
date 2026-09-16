@@ -399,7 +399,8 @@
             "devOnly": "開発者専用コマンド。",
             "lyricsCommandNotFound": "歌詞コマンドが見つかりません。",
             "wrongBot": "このコマンドはこのサーバーのメインボットである {botMention} で実行する必要があります。",
-            "primaryBotFallback": "メインボット"
+            "primaryBotFallback": "メインボット",
+            "devOrGuildOwner": "このコマンドはボット開発者またはサーバー所有者のみが使用できます。"
         },
         "createMessage": "こんにちは、{author}、プレフィックス: {prefix}",
         "cmdLoading": "起動中...",

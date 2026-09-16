@@ -399,7 +399,8 @@
             "devOnly": "Команда только для разработчиков.",
             "lyricsCommandNotFound": "Команда lyrics не найдена.",
             "wrongBot": "Эту команду должен выполнять {botMention} как основной бот этого сервера.",
-            "primaryBotFallback": "основной бот"
+            "primaryBotFallback": "основной бот",
+            "devOrGuildOwner": "Эта команда доступна только разработчикам бота или владельцу сервера."
         },
         "createMessage": "Привет {author}, префикс: {prefix}",
         "cmdLoading": "Загрузка...",

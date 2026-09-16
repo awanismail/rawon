@@ -399,7 +399,8 @@
             "devOnly": "Sadece geliştiricilere özel komut.",
             "lyricsCommandNotFound": "Şarkı sözleri komutu bulunamadı.",
             "wrongBot": "Bu komut, bu sunucunun ana botu olarak {botMention} üzerinde yürütülmelidir.",
-            "primaryBotFallback": "ana bot"
+            "primaryBotFallback": "ana bot",
+            "devOrGuildOwner": "Bu komut yalnızca bot geliştiricileri veya sunucu sahibi tarafından kullanılabilir."
         },
         "createMessage": "Merhaba {author}, ön ek: {prefix}",
         "cmdLoading": "Yükleniyor...",

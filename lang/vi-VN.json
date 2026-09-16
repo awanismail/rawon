@@ -399,7 +399,8 @@
             "devOnly": "Lệnh chỉ dành cho nhà phát triển.",
             "lyricsCommandNotFound": "Không tìm thấy lệnh lời bài hát.",
             "wrongBot": "Lệnh này phải được thực thi trên {botMention} làm bot chính cho máy chủ này.",
-            "primaryBotFallback": "bot chính"
+            "primaryBotFallback": "bot chính",
+            "devOrGuildOwner": "Lệnh này chỉ dành cho nhà phát triển bot hoặc chủ sở hữu máy chủ."
         },
         "createMessage": "Chào {author}, tiền tố: {prefix}",
         "cmdLoading": "Đang tải...",

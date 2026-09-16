@@ -399,7 +399,8 @@
             "devOnly": "Developer-only command.",
             "lyricsCommandNotFound": "Lyrics command not found.",
             "wrongBot": "This command must be executed on {botMention} as the primary bot for this server.",
-            "primaryBotFallback": "the primary bot"
+            "primaryBotFallback": "the primary bot",
+            "devOrGuildOwner": "This command is only available to bot developers or the server owner."
         },
         "createMessage": "Hi {author}, prefix: {prefix}",
         "cmdLoading": "Loading...",

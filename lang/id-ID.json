@@ -399,7 +399,8 @@
             "devOnly": "Command buat developer aja.",
             "lyricsCommandNotFound": "Command lyrics gak ketemu.",
             "wrongBot": "Command ini harus dijalanin di {botMention} sebagai bot utama/primer server ini.",
-            "primaryBotFallback": "bot utama/primer"
+            "primaryBotFallback": "bot utama/primer",
+            "devOrGuildOwner": "Command ini cuma buat developer bot atau pemilik server."
         },
         "createMessage": "Halo {author}, prefix: {prefix}",
         "cmdLoading": "Loading...",

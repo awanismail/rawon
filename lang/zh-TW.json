@@ -399,7 +399,8 @@
             "devOnly": "僅限開發者的指令。",
             "lyricsCommandNotFound": "找不到歌詞指令。",
             "wrongBot": "此指令必須在作為此伺服器主機器人的 {botMention} 上執行。",
-            "primaryBotFallback": "主機器人"
+            "primaryBotFallback": "主機器人",
+            "devOrGuildOwner": "此指令僅適用於機器人開發者或伺服器擁有者。"
         },
         "createMessage": "你好 {author}，前綴：{prefix}",
         "cmdLoading": "加載中...",

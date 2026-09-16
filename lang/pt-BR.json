@@ -399,7 +399,8 @@
             "devOnly": "Comando somente para desenvolvedores.",
             "lyricsCommandNotFound": "Comando de letras não encontrado.",
             "wrongBot": "Este comando deve ser executado no {botMention} como o bot principal para este servidor.",
-            "primaryBotFallback": "o bot principal"
+            "primaryBotFallback": "o bot principal",
+            "devOrGuildOwner": "Este comando está disponível apenas para desenvolvedores do bot ou o proprietário do servidor."
         },
         "createMessage": "Olá {author}, prefixo: {prefix}",
         "cmdLoading": "Carregando...",

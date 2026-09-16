@@ -399,7 +399,8 @@
             "devOnly": "Arahan khusus untuk pembangun.",
             "lyricsCommandNotFound": "Arahan lirik tidak dijumpai.",
             "wrongBot": "Perintah ini mesti dilaksanakan pada {botMention} sebagai bot utama untuk pelayan ini.",
-            "primaryBotFallback": "bot utama"
+            "primaryBotFallback": "bot utama",
+            "devOrGuildOwner": "Arahan ini hanya untuk pembangun bot atau pemilik pelayan."
         },
         "createMessage": "Hai {author}, prefix: {prefix}",
         "cmdLoading": "Memuat...",
