@@ -55,8 +55,35 @@ export class ReadyListener extends Listener<typeof Events.ClientReady> {
         const client = readyClient as Rawon;
         this.currentClient = client;
 
-        if (client.application?.owner) {
-            this.container.config.devs.push(client.application.owner.id);
+        try {
+            const app = await client.application?.fetch();
+            if (app) {
+                const devSet = new Set(this.container.config.devs);
+                if (app.owner) {
+                    if ("members" in app.owner && app.owner.members) {
+                        for (const member of app.owner.members.values()) {
+                            devSet.add(member.id);
+                        }
+                    } else {
+                        devSet.add(app.owner.id);
+                    }
+                }
+                if (app.team?.members) {
+                    for (const member of app.team.members.values()) {
+                        devSet.add(member.id);
+                    }
+                }
+                for (const id of devSet) {
+                    if (!this.container.config.devs.includes(id)) {
+                        this.container.config.devs.push(id);
+                    }
+                }
+                this.container.logger.debug(
+                    `[Startup] Registered ${this.container.config.devs.length} developer ID(s)`,
+                );
+            }
+        } catch (err) {
+            this.container.logger.warn("[Startup] Failed to fetch application owner/team:", err);
         }
 
         client.license.start();
