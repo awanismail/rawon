@@ -269,7 +269,14 @@ export class CommandManager extends Collection<string, CommandComponent> {
             }
         }
 
-        if (command.meta.devOnly === true && !this.client.config.devs.includes(message.author.id)) {
+        const isDev = this.client.config.devs.includes(message.author.id);
+        const isGuildOwner = Boolean(message.guild && message.guild.ownerId === message.author.id);
+
+        if (command.meta.devOrGuildOwner === true && !isDev && !isGuildOwner) {
+            return;
+        }
+
+        if (command.meta.devOnly === true && !isDev) {
             return;
         }
 

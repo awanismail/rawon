@@ -189,6 +189,23 @@ class CommandsCompatibility {
             return;
         }
 
+        const isDeveloper = this.client.config.devs.includes(message.author.id);
+        const isGuildOwner = Boolean(message.guild && message.guild.ownerId === message.author.id);
+
+        if (command.meta.devOrGuildOwner === true && !isDeveloper && !isGuildOwner) {
+            container.logger.warn(
+                `[CommandsCompat] ❌ BLOCKED non-dev/non-owner ${message.author.tag} [${message.author.id}] from using dev/owner command "${command.name}"`,
+            );
+            return;
+        }
+
+        if (command.meta.devOnly === true && !isDeveloper) {
+            container.logger.warn(
+                `[CommandsCompat] ❌ BLOCKED non-dev ${message.author.tag} [${message.author.id}] from using dev-only command "${command.name}"`,
+            );
+            return;
+        }
+
         const ctx = new CommandContext(message, args);
         await resolveAndApplyMusicCommandTarget(ctx, command.name, command.aliases);
 

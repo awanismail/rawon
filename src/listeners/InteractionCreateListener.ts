@@ -285,7 +285,33 @@ export class InteractionCreateListener extends Listener<typeof Events.Interactio
             );
             if (cmd) {
                 const isDeveloper = this.container.config.devs.includes(interaction.user.id);
-                if (getCommandOptions(cmd).devOnly === true && !isDeveloper) {
+                const isGuildOwner = Boolean(
+                    interaction.guild && interaction.guild.ownerId === interaction.user.id,
+                );
+                const cmdOptions = getCommandOptions(cmd);
+
+                if (cmdOptions.devOrGuildOwner === true && !isDeveloper && !isGuildOwner) {
+                    await this.safeReply(
+                        interaction,
+                        {
+                            flags: MessageFlags.Ephemeral,
+                            embeds: [
+                                createEmbed(
+                                    "error",
+                                    __mf("events.createInteraction.devOrGuildOwner"),
+                                    true,
+                                ),
+                            ],
+                        },
+                        "reply to dev-or-guild-owner context menu usage",
+                    );
+                    this.container.logger.warn(
+                        `[MultiBot] ${client.user?.tag} ❌ BLOCKED non-dev/non-owner ${interaction.user.tag} [${interaction.user.id}] from using dev/owner context/menu ${interaction.commandName}`,
+                    );
+                    return;
+                }
+
+                if (cmdOptions.devOnly === true && !isDeveloper) {
                     await this.safeReply(
                         interaction,
                         {
@@ -374,7 +400,33 @@ export class InteractionCreateListener extends Listener<typeof Events.Interactio
                     }
                 }
 
-                if (getCommandOptions(cmd).devOnly === true && !isDeveloper) {
+                const isGuildOwner = Boolean(
+                    interaction.guild && interaction.guild.ownerId === interaction.user.id,
+                );
+                const cmdOptions = getCommandOptions(cmd);
+
+                if (cmdOptions.devOrGuildOwner === true && !isDeveloper && !isGuildOwner) {
+                    await this.safeReply(
+                        interaction,
+                        {
+                            flags: MessageFlags.Ephemeral,
+                            embeds: [
+                                createEmbed(
+                                    "error",
+                                    __mf("events.createInteraction.devOrGuildOwner"),
+                                    true,
+                                ),
+                            ],
+                        },
+                        "reply to dev-or-guild-owner slash usage",
+                    );
+                    this.container.logger.warn(
+                        `[MultiBot] ${client.user?.tag} ❌ BLOCKED non-dev/non-owner ${interaction.user.tag} [${interaction.user.id}] from using dev/owner slash ${interaction.commandName}`,
+                    );
+                    return;
+                }
+
+                if (cmdOptions.devOnly === true && !isDeveloper) {
                     await this.safeReply(
                         interaction,
                         {
@@ -488,7 +540,33 @@ export class InteractionCreateListener extends Listener<typeof Events.Interactio
                     }
 
                     const isDeveloper = this.container.config.devs.includes(interaction.user.id);
-                    if (getCommandOptions(command).devOnly === true && !isDeveloper) {
+                    const isGuildOwner = Boolean(
+                        interaction.guild && interaction.guild.ownerId === interaction.user.id,
+                    );
+                    const cmdOptions = getCommandOptions(command);
+
+                    if (cmdOptions.devOrGuildOwner === true && !isDeveloper && !isGuildOwner) {
+                        await this.safeReply(
+                            interaction,
+                            {
+                                flags: MessageFlags.Ephemeral,
+                                embeds: [
+                                    createEmbed(
+                                        "error",
+                                        __mf("events.createInteraction.devOrGuildOwner"),
+                                        true,
+                                    ),
+                                ],
+                            },
+                            "reply to dev-or-guild-owner select menu usage",
+                        );
+                        this.container.logger.warn(
+                            `[MultiBot] ${client.user?.tag} ❌ BLOCKED non-dev/non-owner ${interaction.user.tag} [${interaction.user.id}] from using dev/owner select ${interaction.customId}`,
+                        );
+                        return;
+                    }
+
+                    if (cmdOptions.devOnly === true && !isDeveloper) {
                         await this.safeReply(
                             interaction,
                             {
