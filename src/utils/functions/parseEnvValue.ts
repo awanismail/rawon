@@ -32,9 +32,7 @@ export function parseEnvValue(str: string): string[] {
     let current = "";
     let inQuotes: string | null = null;
 
-    for (let i = 0; i < input.length; i++) {
-        const char = input[i];
-
+    for (const char of input) {
         if ((char === '"' || char === "'") && (inQuotes === null || inQuotes === char)) {
             inQuotes = inQuotes === null ? char : null;
             current += char;

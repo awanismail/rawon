@@ -363,6 +363,15 @@ export class SetupCommand extends ContextCommand {
                           : "`Disabled`",
                     inline: true,
                 },
+                {
+                    name: "📻 Always On (24/7)",
+                    value: isDefault(bs.alwaysOn, BOT_SETTINGS_DEFAULTS.alwaysOn)
+                        ? "`Default`"
+                        : bs.alwaysOn
+                          ? "`Enabled`"
+                          : "`Disabled`",
+                    inline: true,
+                },
             )
             .setFooter({
                 text: ctx.author.tag,
@@ -771,6 +780,7 @@ export class SetupCommand extends ContextCommand {
             "default_volume",
             "music_selection_type",
             "enable_audio_cache",
+            "always_on",
         ];
 
         for (const key of keys) {
