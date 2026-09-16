@@ -32,3 +32,6 @@ dist
 cache
 cookies.txt
 *.cookies.txt
+
+# Local build scripts with tokens
+build-and-push.*
