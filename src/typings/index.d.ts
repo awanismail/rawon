@@ -97,6 +97,7 @@ export type CommandComponent = {
         cooldown?: number;
         disable?: boolean;
         devOnly?: boolean;
+        devOrGuildOwner?: boolean;
         usage?: string;
         name: string;
     };
@@ -111,6 +112,7 @@ export type CategoryMeta = {
 declare module "@sapphire/framework" {
     interface CommandOptions {
         devOnly?: boolean;
+        devOrGuildOwner?: boolean;
         cooldown?: number;
         contextChat?: string;
         contextUser?: string;
@@ -124,6 +126,7 @@ export type CommandMeta = {
     aliases?: readonly string[];
     cooldown?: number;
     devOnly?: boolean;
+    devOrGuildOwner?: boolean;
     contextChat?: string;
     contextUser?: string;
     disable?: boolean;

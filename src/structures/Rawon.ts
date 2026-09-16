@@ -37,6 +37,7 @@ interface CompatibleCommand extends Command {
         aliases?: readonly string[];
         cooldown?: number;
         devOnly?: boolean;
+        devOrGuildOwner?: boolean;
         contextChat?: string;
         contextUser?: string;
         disable?: boolean;
@@ -54,6 +55,7 @@ interface CommandCategory {
 function wrapCommand(cmd: Command): CompatibleCommand {
     const opts = cmd.options as Command.Options & {
         devOnly?: boolean;
+        devOrGuildOwner?: boolean;
         cooldown?: number;
         contextChat?: string;
         contextUser?: string;
@@ -66,6 +68,7 @@ function wrapCommand(cmd: Command): CompatibleCommand {
             aliases: cmd.aliases as readonly string[],
             cooldown: opts.cooldown,
             devOnly: opts.devOnly,
+            devOrGuildOwner: opts.devOrGuildOwner,
             contextChat: opts.contextChat,
             contextUser: opts.contextUser,
             disable: opts.disable,
