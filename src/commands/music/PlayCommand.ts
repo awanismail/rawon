@@ -3,7 +3,7 @@ import { type Command } from "@sapphire/framework";
 import { type CommandContext, ContextCommand } from "@stegripe/command-context";
 import {
     type GuildMember,
-    type Message,
+    Message,
     PermissionFlagsBits,
     type SlashCommandBuilder,
     type VoiceBasedChannel,
@@ -89,9 +89,10 @@ export class PlayCommand extends ContextCommand {
             return handleVideos(client, localCtx, toQueue, voiceChannel);
         }
 
-        const audioAttachment = ctx.isMessage()
-            ? ctx.context.attachments.find((a) => a.contentType?.startsWith("audio/"))
-            : undefined;
+        const audioAttachment =
+            ctx.context instanceof Message
+                ? ctx.context.attachments.find((a) => a.contentType?.startsWith("audio/"))
+                : undefined;
         const query =
             (localCtx.args.join(" ") ||
                 localCtx.options?.getString("query") ||
