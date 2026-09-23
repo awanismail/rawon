@@ -11,7 +11,7 @@ import { getNextTitleTier, getTitlePhrase } from "../../utils/functions/userStat
 
 @ApplyOptions<Command.Options>({
     name: "profile",
-    aliases: ["stats"],
+    aliases: [],
     description: i18n.__("commands.music.profile.description"),
     detailedDescription: { usage: i18n.__("commands.music.profile.usage") },
     requiredClientPermissions: [
