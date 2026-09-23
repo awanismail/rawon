@@ -206,6 +206,15 @@
             }
         },
         "music": {
+            "247": {
+                "description": "Aktifkan mode 24/7 agar bot menetap di voice channel",
+                "usage": "{prefix}247 [enable | disable]",
+                "slashStateDescription": "Status 24/7 baru",
+                "actualState": "Status 24/7 saat ini: {state}",
+                "enabledMsg": "Mode 24/7 aktif — bot akan menetap di voice channel.",
+                "disabledMsg": "Mode 24/7 nonaktif.",
+                "noPermission": "Kamu butuh role DJ atau izin Manage Server untuk mengubah mode 24/7."
+            },
             "dj": {
                 "description": "Ganti setting fitur DJ",
                 "usage": "{prefix}dj <enable | disable | role> [role]",
@@ -491,6 +500,23 @@
                 "audiophile": "Audiofil",
                 "melomaniac": "Melomaniak",
                 "musicLegend": "Legenda Musik"
+            },
+            "move": {
+                "description": "Pindahkan lagu ke posisi lain di queue",
+                "usage": "{prefix}move <dari> <ke>",
+                "slashFromDescription": "Posisi lagu yang mau dipindah",
+                "slashToDescription": "Posisi baru untuk lagunya",
+                "invalidPosition": "Posisi tidak valid. Pakai dua angka berbeda antara **2** dan **{max}**.",
+                "samePosition": "Lagu itu memang sudah di posisi **{position}**.",
+                "playingSongPosition": "Posisi **1** adalah lagu yang sedang diputar dan tidak bisa digeser.",
+                "success": "{song} dipindah dari posisi **{from}** ke **{to}**."
+            },
+            "clear": {
+                "description": "Hapus semua lagu mendatang dari queue",
+                "usage": "{prefix}clear",
+                "alreadyEmpty": "Queuenya memang sudah kosong.",
+                "removedSingular": "**1** lagu mendatang dihapus. Lagu yang sedang main tetap lanjut.",
+                "removedPlural": "**{count}** lagu mendatang dihapus. Lagu yang sedang main tetap lanjut."
             }
         }
     },

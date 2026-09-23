@@ -206,6 +206,15 @@
             }
         },
         "music": {
+            "247": {
+                "description": "Toggle 24/7 mode so the bot stays in the voice channel",
+                "usage": "{prefix}247 [enable | disable]",
+                "slashStateDescription": "New 24/7 state",
+                "actualState": "Current 24/7 state: {state}",
+                "enabledMsg": "24/7 mode is now enabled — the bot will stay in the voice channel.",
+                "disabledMsg": "24/7 mode is now disabled.",
+                "noPermission": "You need the DJ role or Manage Server permission to change 24/7 mode."
+            },
             "dj": {
                 "description": "更改 DJ 功能设置",
                 "usage": "{prefix}dj <enable | disable | role> [身分组]",
@@ -491,6 +500,23 @@
                 "audiophile": "Audiophile",
                 "melomaniac": "Melomaniac",
                 "musicLegend": "Music Legend"
+            },
+            "move": {
+                "description": "Move a song to a different position in the queue",
+                "usage": "{prefix}move <from> <to>",
+                "slashFromDescription": "Position of the song to move",
+                "slashToDescription": "New position for the song",
+                "invalidPosition": "Invalid positions. Use two different numbers between **2** and **{max}**.",
+                "samePosition": "That song is already at position **{position}**.",
+                "playingSongPosition": "Position **1** is the currently playing song and cannot be moved.",
+                "success": "Moved {song} from position **{from}** to **{to}**."
+            },
+            "clear": {
+                "description": "Clear all upcoming songs from the queue",
+                "usage": "{prefix}clear",
+                "alreadyEmpty": "The queue is already empty.",
+                "removedSingular": "Removed **1** upcoming song. The current song keeps playing.",
+                "removedPlural": "Removed **{count}** upcoming songs. The current song keeps playing."
             }
         }
     },
