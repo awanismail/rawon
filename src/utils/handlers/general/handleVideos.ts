@@ -337,6 +337,10 @@ export async function handleVideos(
     if (ctx.guild?.queue) {
         await sendConfirmation();
 
+        if (ctx.guild) {
+            void client.data.incrementUserPlays(ctx.guild.id, ctx.author.id, toQueue.length);
+        }
+
         if (wasIdle === true) {
             void play(ctx.guild, undefined, wasIdle);
         }
@@ -363,6 +367,10 @@ export async function handleVideos(
     const serverQueue = new ServerQueue(queueTextChannel);
     (ctx.guild as NonNullable<typeof ctx.guild>).queue = serverQueue;
     await sendConfirmation();
+
+    if (ctx.guild) {
+        void client.data.incrementUserPlays(ctx.guild.id, ctx.author.id, toQueue.length);
+    }
 
     client.debugLog.logData(
         "info",
