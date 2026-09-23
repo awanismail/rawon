@@ -1,12 +1,12 @@
-# Design: User Playlists & Favorite Songs
+# Design: User Playlists, Favorites, Activity Leaderboard & Default Prefix
 
 - **Date**: 2026-09-23
-- **Status**: Approved (brainstorming session)
+- **Status**: Approved (brainstorming session; round 2 added leaderboard/titles + prefix default)
 - **Project**: nada-bot (Discord music bot, Sapphire framework + better-sqlite3)
 
 ## Context
 
-nada-bot persists guild settings and per-guild queue state in SQLite (`SQLiteDataManager`), but users have no way to save music across sessions. This design adds per-user playlists and a favorites list.
+nada-bot persists guild settings and per-guild queue state in SQLite (`SQLiteDataManager`), but users have no way to save music across sessions. This design adds per-user playlists, a favorites list, a per-guild activity leaderboard with automatic titles (julukan), and changes the default command prefix to `nada`.
 
 The user originally referenced `D:\PROJECTs\Typescript\musicify` as containing this feature. Investigation found no committed playlist/favorites code there — only `DROP TABLE playlists / playlist_tracks` remnants of a removed local prototype. The feature is therefore designed fresh for nada-bot; musicify contributed supporting ideas only (URL-keyed duplicate reporting, import UX).
 
@@ -15,11 +15,16 @@ The user originally referenced `D:\PROJECTs\Typescript\musicify` as containing t
 | Question | Decision |
 |---|---|
 | Reference feature in musicify | Does not exist in committed code; design fresh |
-| Data scope | Global per Discord user (usable in any guild the bot is in) |
+| Data scope (playlists/favorites) | Global per Discord user (usable in any guild the bot is in) |
 | Favorites model | A special, built-in playlist row (`is_special`), not a separate table/concept |
 | Command shape | Two commands: `playlist` (subcommands) + `favorite` |
 | Storage model | Single table + `songs_json` blob (mirrors existing `queue_states` pattern); rejected normalized `playlists`/`playlist_tracks` and legacy JSON files |
 | v1 extras | Save-current-queue-as-playlist, favorite currently-playing song, select-menu playlist picker, import external playlist URLs |
+| Default prefix | Change production fallback from `!` to `nada` |
+| Leaderboard metric | Songs requested — each song successfully enqueued by a user's command counts 1 point |
+| Leaderboard scope | Per guild (points, ranking, and titles are per-guild) |
+| Title (julukan) model | Fixed automatic milestone tiers computed from play count at read time |
+| Stats display | `leaderboard` and `profile` commands (user skipped the display question; player-embed title display deferred — see Out of Scope) |
 
 ## Data Model
 
@@ -109,6 +114,62 @@ Name `favorite`, aliases `fav`, `like`.
 
 All replies use `createEmbed("info"|"warn"|"error")`; select-menu interactions are locked to `ctx.author.id`, matching existing `ButtonPagination` behavior.
 
+## Default Prefix Change
+
+`src/config/env.ts` currently defines `mainPrefix = isDev ? "d!" : (process.env.MAIN_PREFIX ?? "") || "!"`. Change the production fallback from `!` to `nada`:
+
+- `src/config/env.ts` — `(process.env.MAIN_PREFIX ?? "") || "nada"` (dev prefix `d!` stays as-is)
+- `.env.example` — update the `MAIN_PREFIX` entry to document the `nada` default
+
+Everything downstream (`clientOptions.defaultPrefix`, per-guild `prefix` overrides, `altPrefix` bot settings) already resolves through `mainPrefix`, so no other code changes. Existing deployments that set a custom prefix per guild or via `MAIN_PREFIX` are unaffected.
+
+## Activity Stats, Leaderboard & Titles (Julukan)
+
+### Data model
+
+```sql
+CREATE TABLE IF NOT EXISTS guild_user_stats (
+    guild_id      TEXT NOT NULL,
+    user_id       TEXT NOT NULL,
+    play_count    INTEGER NOT NULL DEFAULT 0,
+    last_played_at INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (guild_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_guild_user_stats_rank
+    ON guild_user_stats(guild_id, play_count DESC);
+```
+
+### Metric & counting rules
+
+- **1 point per song successfully enqueued into the live queue** by a user-initiated command (play, search select, `playlist play`, `favorite play` — every path that adds songs to the queue on a user's behalf). A playlist of 30 songs adds 30 points.
+- Points are **per (guild, user)**; the same person accumulates separate counts in each guild.
+- The increment hooks into the user-driven enqueue path (`handleVideos` and the new playlist/favorite play paths), attributed to the command invoker. **Queue restore on startup (`ReadyListener.restoreQueueStates`) must NOT increment** — it is not a user action. Adding songs to a *saved playlist* (not the queue) does not increment either; only queue enqueues count.
+
+### SQLiteDataManager methods (also on `ExtendedDataManager`)
+
+- `incrementUserPlays(guildId, userId, count)` — UPSERT `play_count = play_count + count`, `last_played_at = now`
+- `getUserStats(guildId, userId)` → `{ playCount, lastPlayedAt, rank }` (rank computed as 1 + number of users with a higher count in that guild)
+- `getGuildLeaderboard(guildId, limit, offset)` → rows ordered by `play_count DESC, last_played_at ASC` (stable tie-break)
+
+### Title tiers (julukan)
+
+Fixed ladder, defined as constants in `src/utils/functions/userStats.ts`, computed from `play_count` at read time (nothing stored, so tiers auto-upgrade when thresholds change):
+
+| Min plays | id-ID | en-US |
+|---|---|---|
+| 0 | Pendengar Baru | New Listener |
+| 25 | Penikmat Musik | Music Enjoyer |
+| 100 | Audiofil | Audiophile |
+| 500 | Melomaniak | Melomaniac |
+| 1000 | Legenda Musik | Music Legend |
+
+### Commands
+
+- **`LeaderboardCommand`** — `src/commands/music/LeaderboardCommand.ts`, name `leaderboard`, alias `lb`. Per-guild top list (10 per page, `ButtonPagination`), each row showing rank, user mention (resolved via guild member fetch, falling back to the raw id if the member left), play count, and current title.
+- **`ProfileCommand`** — `src/commands/music/ProfileCommand.ts`, name `profile`, alias `stats`. Shows the invoker's (or a mentioned user's) play count, guild rank, current title, and progress to the next tier (simple text progress like `37/100`).
+
+Titles appear only in `leaderboard`/`profile` output in v1 (see Out of Scope).
+
 ## Limits & Validation
 
 Constants defined once and enforced in the shared helper:
@@ -125,7 +186,7 @@ Every failure mode replies with a one-sentence i18n embed (`warn`/`error`): name
 
 ## i18n
 
-New keys under `commands.music.playlist.*` and `commands.music.favorite.*`:
+New keys under `commands.music.playlist.*`, `commands.music.favorite.*`, `commands.music.leaderboard.*`, and `commands.music.profile.*`, plus the tier names under a shared key namespace (e.g. `commands.music.titles.*`):
 
 - `lang/en-US.json` — authoritative, complete
 - `lang/id-ID.json` — properly translated
@@ -144,6 +205,8 @@ The project has no test framework; its convention is `pnpm lint` (Biome) + `pnpm
    - Limits: 26th playlist rejected; 201st track rejected; `Favorites` name reserved
    - Duplicate `pl add` reports the existing position
    - `db-export` (dev command) to inspect `user_playlists` contents
+   - Stats: `play` of a 3-song query adds 3 points; **restart with a saved queue restores it without adding points**; `pl add` to a saved playlist does not add points; `lb` ordering correct with ties; `profile` shows rank and progress; tier changes at 25/100/500/1000 boundaries
+   - Prefix: fresh env without `MAIN_PREFIX` responds to `nada`; existing per-guild custom prefixes still work
 3. Cross-restart persistence relies on the existing WAL + `OperationManager` flush behavior.
 
 ## Out of Scope (v1)
@@ -153,3 +216,7 @@ The project has no test framework; its convention is `pnpm lint` (Biome) + `pnpm
 - Public playlist links or export files
 - Per-guild playlists
 - Scheduled/automatic playlist backup beyond the existing DB export tooling
+- Titles displayed in now-playing / queue embeds next to the requester
+- Assigning Discord roles based on title tiers
+- Global (cross-guild) leaderboard mode
+- User-selectable titles from unlocked tiers
