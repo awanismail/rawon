@@ -61,6 +61,17 @@ async function hasElevatedMusicPermission({
     return djRole !== null && member.roles.cache.has(djRole.id);
 }
 
+export async function hasDJOrManagePermission({
+    client,
+    guild,
+    member,
+}: MusicPermissionOptions): Promise<boolean> {
+    if (!isDJEnabled(client, guild)) {
+        return true;
+    }
+    return hasElevatedMusicPermission({ client, guild, member });
+}
+
 export async function hasMusicControlPermission({
     client,
     guild,
