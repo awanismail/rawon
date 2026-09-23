@@ -79,7 +79,7 @@ export const mainPrefixes: string[] =
     rawMainPrefixes.length > 0
         ? rawMainPrefixes
         : Array.from({ length: isMultiBot ? discordTokens.length : 1 }, (_, i) =>
-              i === 0 ? fallbackMainPrefix : fallbackMainPrefix + (alphabet[i] ?? String(i)),
+              isMultiBot ? (alphabet[i] ?? `${fallbackMainPrefix}${i}`) : fallbackMainPrefix,
           );
 export const mainPrefixAutoAssigned = autoAssignPrefixes;
 export const mainPrefix = mainPrefixes[0];
