@@ -171,6 +171,41 @@ export type SavedQueueSong = {
     key: string;
 };
 
+export type SavedPlaylistSong = Song & { addedAt: number };
+
+export type Playlist = {
+    playlistId: string;
+    userId: string;
+    name: string;
+    isSpecial: boolean;
+    createdAt: number;
+    updatedAt: number;
+    songs: SavedPlaylistSong[];
+};
+
+export type PlaylistMeta = {
+    playlistId: string;
+    name: string;
+    isSpecial: boolean;
+    createdAt: number;
+    updatedAt: number;
+    trackCount: number;
+};
+
+export type UserPlayStats = {
+    userId: string;
+    playCount: number;
+    lastPlayedAt: number;
+    rank: number;
+};
+
+export type GuildLeaderboardEntry = {
+    userId: string;
+    playCount: number;
+    lastPlayedAt: number;
+    rank: number;
+};
+
 export type LoopMode = "OFF" | "QUEUE" | "SONG";
 
 export type LyricsAPIResult<E extends boolean> = {
@@ -368,6 +403,17 @@ export interface ExtendedDataManager {
         voiceChannelStatusState: GuildData["voiceChannelStatusState"],
     ): Promise<void>;
     deleteVoiceChannelStatusState(guildId: string, botId: string): Promise<void>;
+    getUserPlaylistById(userId: string, playlistId: string): Playlist | null;
+    getUserPlaylistByName(userId: string, name: string): Playlist | null;
+    getUserPlaylistMetas(userId: string): PlaylistMeta[];
+    createUserPlaylist(userId: string, name: string, isSpecial?: boolean): Promise<Playlist>;
+    saveUserPlaylist(playlist: Playlist): Promise<void>;
+    renameUserPlaylist(userId: string, oldName: string, newName: string): Promise<boolean>;
+    deleteUserPlaylist(userId: string, name: string): Promise<boolean>;
+    incrementUserPlays(guildId: string, userId: string, count: number): Promise<void>;
+    getUserPlayStats(guildId: string, userId: string): UserPlayStats | null;
+    getGuildLeaderboard(guildId: string, limit: number, offset: number): GuildLeaderboardEntry[];
+    countGuildStats(guildId: string): number;
 }
 
 declare module "@sapphire/framework" {

@@ -1,7 +1,15 @@
 import { existsSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import Database from "better-sqlite3";
-import { type BotSettings, type GuildData } from "../../typings/index.js";
+import { SnowflakeUtil } from "discord.js";
+import {
+    type BotSettings,
+    type GuildData,
+    type GuildLeaderboardEntry,
+    type Playlist,
+    type PlaylistMeta,
+    type UserPlayStats,
+} from "../../typings/index.js";
 import { normalizeSearchProvider } from "../functions/searchProvider.js";
 import { OperationManager } from "./OperationManager.js";
 
@@ -190,6 +198,31 @@ export class SQLiteDataManager<T extends Record<string, GuildData> = Record<stri
                 ALTER TABLE bot_settings ADD COLUMN search_provider TEXT;
             `);
         }
+
+        this.db.exec(`
+            CREATE TABLE IF NOT EXISTS user_playlists (
+                user_id TEXT NOT NULL,
+                playlist_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                is_special INTEGER NOT NULL DEFAULT 0,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL,
+                track_count INTEGER NOT NULL DEFAULT 0,
+                songs_json TEXT NOT NULL DEFAULT '[]',
+                PRIMARY KEY (playlist_id)
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_user_playlists_un
+                ON user_playlists(user_id, name COLLATE NOCASE);
+            CREATE TABLE IF NOT EXISTS guild_user_stats (
+                guild_id TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                play_count INTEGER NOT NULL DEFAULT 0,
+                last_played_at INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (guild_id, user_id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_guild_user_stats_rank
+                ON guild_user_stats(guild_id, play_count DESC);
+        `);
     }
 
     public get data(): T | null {
@@ -703,6 +736,233 @@ export class SQLiteDataManager<T extends Record<string, GuildData> = Record<stri
         await this.manager.add(async () => {
             this.db.prepare("DELETE FROM guilds WHERE guild_id = ?").run(guildId);
         });
+    }
+
+    private mapPlaylistRow(row: {
+        user_id: string;
+        playlist_id: string;
+        name: string;
+        is_special: number;
+        created_at: number;
+        updated_at: number;
+        track_count: number;
+        songs_json: string;
+    }): Playlist {
+        return {
+            playlistId: row.playlist_id,
+            userId: row.user_id,
+            name: row.name,
+            isSpecial: row.is_special === 1,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at,
+            songs: JSON.parse(row.songs_json) as Playlist["songs"],
+        };
+    }
+
+    public getUserPlaylistMetas(userId: string): PlaylistMeta[] {
+        const rows = this.db
+            .prepare(
+                "SELECT playlist_id, name, is_special, created_at, updated_at, track_count FROM user_playlists WHERE user_id = ? ORDER BY is_special DESC, updated_at DESC",
+            )
+            .all(userId) as Array<{
+            playlist_id: string;
+            name: string;
+            is_special: number;
+            created_at: number;
+            updated_at: number;
+            track_count: number;
+        }>;
+        return rows.map((row) => ({
+            playlistId: row.playlist_id,
+            name: row.name,
+            isSpecial: row.is_special === 1,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at,
+            trackCount: row.track_count,
+        }));
+    }
+
+    public getUserPlaylistByName(userId: string, name: string): Playlist | null {
+        const row = this.db
+            .prepare("SELECT * FROM user_playlists WHERE user_id = ? AND name = ? COLLATE NOCASE")
+            .get(userId, name) as
+            | {
+                  user_id: string;
+                  playlist_id: string;
+                  name: string;
+                  is_special: number;
+                  created_at: number;
+                  updated_at: number;
+                  track_count: number;
+                  songs_json: string;
+              }
+            | undefined;
+        return row === undefined ? null : this.mapPlaylistRow(row);
+    }
+
+    public getUserPlaylistById(userId: string, playlistId: string): Playlist | null {
+        const row = this.db
+            .prepare("SELECT * FROM user_playlists WHERE user_id = ? AND playlist_id = ?")
+            .get(userId, playlistId) as
+            | {
+                  user_id: string;
+                  playlist_id: string;
+                  name: string;
+                  is_special: number;
+                  created_at: number;
+                  updated_at: number;
+                  track_count: number;
+                  songs_json: string;
+              }
+            | undefined;
+        return row === undefined ? null : this.mapPlaylistRow(row);
+    }
+
+    public async createUserPlaylist(
+        userId: string,
+        name: string,
+        isSpecial = false,
+    ): Promise<Playlist> {
+        const playlist: Playlist = {
+            playlistId: isSpecial
+                ? `${userId}-favorites`
+                : SnowflakeUtil.generate().toLocaleString(),
+            userId,
+            name,
+            isSpecial,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            songs: [],
+        };
+        await this.manager.add(async () => {
+            this.db
+                .prepare(
+                    "INSERT INTO user_playlists (user_id, playlist_id, name, is_special, created_at, updated_at, track_count, songs_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                )
+                .run(
+                    playlist.userId,
+                    playlist.playlistId,
+                    playlist.name,
+                    playlist.isSpecial ? 1 : 0,
+                    playlist.createdAt,
+                    playlist.updatedAt,
+                    0,
+                    "[]",
+                );
+        });
+        return playlist;
+    }
+
+    public async saveUserPlaylist(playlist: Playlist): Promise<void> {
+        await this.manager.add(async () => {
+            this.db
+                .prepare(
+                    "INSERT INTO user_playlists (user_id, playlist_id, name, is_special, created_at, updated_at, track_count, songs_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(playlist_id) DO UPDATE SET name = excluded.name, updated_at = excluded.updated_at, track_count = excluded.track_count, songs_json = excluded.songs_json",
+                )
+                .run(
+                    playlist.userId,
+                    playlist.playlistId,
+                    playlist.name,
+                    playlist.isSpecial ? 1 : 0,
+                    playlist.createdAt,
+                    Date.now(),
+                    playlist.songs.length,
+                    JSON.stringify(playlist.songs),
+                );
+        });
+    }
+
+    public async renameUserPlaylist(
+        userId: string,
+        oldName: string,
+        newName: string,
+    ): Promise<boolean> {
+        let renamed = false;
+        await this.manager.add(async () => {
+            const changes = this.db
+                .prepare(
+                    "UPDATE user_playlists SET name = ?, updated_at = ? WHERE user_id = ? AND name = ? COLLATE NOCASE AND is_special = 0",
+                )
+                .run(newName, Date.now(), userId, oldName).changes;
+            renamed = changes > 0;
+        });
+        return renamed;
+    }
+
+    public async deleteUserPlaylist(userId: string, name: string): Promise<boolean> {
+        let deleted = false;
+        await this.manager.add(async () => {
+            const changes = this.db
+                .prepare(
+                    "DELETE FROM user_playlists WHERE user_id = ? AND name = ? COLLATE NOCASE AND is_special = 0",
+                )
+                .run(userId, name).changes;
+            deleted = changes > 0;
+        });
+        return deleted;
+    }
+
+    public async incrementUserPlays(guildId: string, userId: string, count: number): Promise<void> {
+        await this.manager.add(async () => {
+            this.db
+                .prepare(
+                    "INSERT INTO guild_user_stats (guild_id, user_id, play_count, last_played_at) VALUES (?, ?, ?, ?) ON CONFLICT(guild_id, user_id) DO UPDATE SET play_count = play_count + excluded.play_count, last_played_at = excluded.last_played_at",
+                )
+                .run(guildId, userId, count, Date.now());
+        });
+    }
+
+    public getUserPlayStats(guildId: string, userId: string): UserPlayStats | null {
+        const row = this.db
+            .prepare(
+                "SELECT play_count, last_played_at FROM guild_user_stats WHERE guild_id = ? AND user_id = ?",
+            )
+            .get(guildId, userId) as { play_count: number; last_played_at: number } | undefined;
+        if (row === undefined) {
+            return null;
+        }
+        const higher = this.db
+            .prepare(
+                "SELECT COUNT(*) AS c FROM guild_user_stats WHERE guild_id = ? AND play_count > ?",
+            )
+            .get(guildId, row.play_count) as { c: number };
+        return {
+            userId,
+            playCount: row.play_count,
+            lastPlayedAt: row.last_played_at,
+            rank: higher.c + 1,
+        };
+    }
+
+    public getGuildLeaderboard(
+        guildId: string,
+        limit: number,
+        offset: number,
+    ): GuildLeaderboardEntry[] {
+        const rows = this.db
+            .prepare(
+                "SELECT user_id, play_count, last_played_at FROM guild_user_stats WHERE guild_id = ? ORDER BY play_count DESC, last_played_at ASC, user_id ASC LIMIT ? OFFSET ?",
+            )
+            .all(guildId, limit, offset) as Array<{
+            user_id: string;
+            play_count: number;
+            last_played_at: number;
+        }>;
+        return rows.map((row, index) => ({
+            userId: row.user_id,
+            playCount: row.play_count,
+            lastPlayedAt: row.last_played_at,
+            rank: offset + index + 1,
+        }));
+    }
+
+    public countGuildStats(guildId: string): number {
+        const row = this.db
+            .prepare(
+                "SELECT COUNT(*) AS c FROM guild_user_stats WHERE guild_id = ? AND play_count > 0",
+            )
+            .get(guildId) as { c: number };
+        return row.c;
     }
 
     public getCookiesState(): {
