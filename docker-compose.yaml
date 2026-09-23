@@ -1,5 +1,6 @@
 x-common-general: &common-general
   restart: unless-stopped
+  init: true
   deploy:
     resources:
       limits:
@@ -8,14 +9,16 @@ x-common-general: &common-general
 services:
   rawon:
     <<: *common-general
-    # build:
-    #   context: .
-    #   dockerfile: Dockerfile
-    image: ghcr.io/stegripe/rawon:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: awanismail/rawon:nada-bot
     container_name: rawon-bot
     env_file:
-      - .env
-      - dev.env
+      - path: .env
+        required: true
+      - path: dev.env
+        required: false
     ports:
       - "${DEVTOOLS_PORT:-3000}:${DEVTOOLS_PORT:-3000}"
     volumes:

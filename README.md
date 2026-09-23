@@ -51,10 +51,24 @@ Example: `!requestchannel #music-requests`
 
 ### Docker Setup (Recommended)
 
-#### Using Docker Compose
-1. Create a `.env` file with your configuration (copy from `.env.example`)
-2. Create `dev.env` from `dev.env.example`, or remove the `dev.env` line from `env_file`
-3. Create a `docker-compose.yaml` file:
+This fork ships a `docker-compose.yaml` that **builds the image from your local source**, so all fork features (playlists, favorites, leaderboard, `nada` prefix) are included. Deploying is three steps:
+
+1. Create a `.env` file with your configuration (copy from `.env.example`); `DISCORD_TOKEN` is required
+2. Optionally create `dev.env` from `dev.env.example` — the compose file treats it as optional
+3. Start the bot:
+```sh
+docker compose up -d --build
+```
+4. View logs:
+```sh
+docker logs -f rawon-bot
+```
+
+Rebuild after pulling new code with `docker compose up -d --build`. The named volume `rawon` holds `/app/cache` (the SQLite database with guild settings, saved queues, playlists, favorites, and play stats) and survives rebuilds.
+
+#### Using the upstream image instead
+
+To run the unmodified upstream bot rather than this fork's build, replace the `build:`/`image:` block in `docker-compose.yaml` with `image: ghcr.io/stegripe/rawon:latest`:
 ```yaml
 services:
   rawon:
@@ -71,14 +85,6 @@ services:
 
 volumes:
   rawon:
-```
-4. Start the bot:
-```sh
-docker compose up -d
-```
-5. View logs:
-```sh
-docker logs -f rawon-bot
 ```
 
 #### Using Docker Run
