@@ -14,6 +14,7 @@ import {
 import { createVoiceAdapter } from "../utils/functions/createVoiceAdapter.js";
 import { type filterArgs } from "../utils/functions/ffmpegArgs.js";
 import { formatMS } from "../utils/functions/formatMS.js";
+import { getBotDefaultPrefix } from "../utils/functions/getEffectivePrefix.js";
 import { play } from "../utils/handlers/GeneralUtil.js";
 import {
     hasGetGuildIdsWithQueueState,
@@ -668,7 +669,7 @@ export class ReadyListener extends Listener<typeof Events.ClientReady> {
         }
 
         return newText
-            .replaceAll("{prefix}", this.container.config.mainPrefix)
+            .replaceAll("{prefix}", getBotDefaultPrefix(this.currentClient))
             .replaceAll("{username}", client.user?.username ?? "");
     }
 

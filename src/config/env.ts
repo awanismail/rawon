@@ -68,7 +68,14 @@ const computedIsDev = process.env.NODE_ENV?.toLowerCase() === "development";
 export const isDev = computedIsDev;
 export const isProd = !computedIsDev;
 
-export const mainPrefix = isDev ? "d!" : (process.env.MAIN_PREFIX ?? "") || "nada";
+const fallbackMainPrefix = isDev ? "d!" : "nada";
+const rawMainPrefixes = (process.env.MAIN_PREFIX ?? "")
+    .split(",")
+    .map((prefix) => prefix.trim())
+    .filter((prefix) => prefix.length > 0);
+export const mainPrefixes: string[] =
+    rawMainPrefixes.length > 0 ? rawMainPrefixes : [fallbackMainPrefix];
+export const mainPrefix = mainPrefixes[0];
 export const mainServer = parseEnvValue(process.env.MAIN_SERVER ?? "");
 export const devs: string[] = parseEnvValue(process.env.DEVS ?? "");
 export const lang = formatLocale(process.env.LOCALE) || "en-US";

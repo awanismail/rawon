@@ -13,6 +13,7 @@ import { CommandContext } from "../structures/CommandContext.js";
 import { type Rawon } from "../structures/Rawon.js";
 import { createEmbed } from "../utils/functions/createEmbed.js";
 import { formatBoldCodeSpan } from "../utils/functions/formatCodeSpan.js";
+import { getBotDefaultPrefix } from "../utils/functions/getEffectivePrefix.js";
 import { i18n__, i18n__mf } from "../utils/functions/i18n.js";
 import {
     isPlaybackMusicCommandName,
@@ -104,7 +105,7 @@ export class MessageCreateListener extends Listener<typeof Events.MessageCreate>
             prefixList.push(guildPrefix);
         } else {
             prefixList.push(...this.container.data.botSettings.altPrefix);
-            prefixList.push(this.container.config.mainPrefix);
+            prefixList.push(getBotDefaultPrefix(client));
         }
 
         this.container.logger.debug(

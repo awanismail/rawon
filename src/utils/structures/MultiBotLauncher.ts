@@ -1,6 +1,12 @@
 import process from "node:process";
 import { setTimeout } from "node:timers";
-import { clientOptions, discordTokens, isMultiBot, isProd } from "../../config/index.js";
+import {
+    clientOptions,
+    discordTokens,
+    isMultiBot,
+    isProd,
+    mainPrefixes,
+} from "../../config/index.js";
 import { Rawon } from "../../structures/Rawon.js";
 import { createScopedLogger } from "./createLogger.js";
 import { MultiBotManager } from "./MultiBotManager.js";
@@ -95,7 +101,10 @@ export class MultiBotLauncher {
         tokenIndex: number,
         options: typeof clientOptions,
     ): Promise<Rawon> {
-        const client = new Rawon(options);
+        const client = new Rawon({
+            ...options,
+            defaultPrefix: mainPrefixes[Math.min(tokenIndex, mainPrefixes.length - 1)],
+        });
         client.on("clientReady", () => {
             log.info(
                 `[MultiBot] Bot #${tokenIndex} (${client.user?.tag}) is ready! (${client.guilds.cache.size} guilds)`,
