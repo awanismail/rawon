@@ -2,7 +2,7 @@ import { setInterval, setTimeout } from "node:timers";
 import { joinVoiceChannel } from "@discordjs/voice";
 import { ApplyOptions } from "@sapphire/decorators";
 import { Events, Listener, type ListenerOptions } from "@sapphire/framework";
-import { ActivityType, ChannelType, type Presence, type TextChannel } from "discord.js";
+import { ActivityType, ChannelType, type Presence, Team, type TextChannel } from "discord.js";
 import i18n from "../config/index.js";
 import { type Rawon } from "../structures/Rawon.js";
 import { ServerQueue } from "../structures/ServerQueue.js";
@@ -55,8 +55,13 @@ export class ReadyListener extends Listener<typeof Events.ClientReady> {
         const client = readyClient as Rawon;
         this.currentClient = client;
 
-        if (client.application?.owner) {
-            this.container.config.devs.push(client.application.owner.id);
+        await client.application?.fetch().catch(() => null);
+        const owner = client.application?.owner;
+        if (owner) {
+            const ownerId = owner instanceof Team ? owner.ownerId : owner.id;
+            if (ownerId && !this.container.config.devs.includes(ownerId)) {
+                this.container.config.devs.push(ownerId);
+            }
         }
 
         const isPrimaryOrSingle =
