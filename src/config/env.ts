@@ -68,7 +68,7 @@ const computedIsDev = process.env.NODE_ENV?.toLowerCase() === "development";
 export const isDev = computedIsDev;
 export const isProd = !computedIsDev;
 
-export const mainPrefix = isDev ? "d!" : (process.env.MAIN_PREFIX ?? "") || "!";
+export const mainPrefix = isDev ? "d!" : (process.env.MAIN_PREFIX ?? "") || "nada";
 export const mainServer = parseEnvValue(process.env.MAIN_SERVER ?? "");
 export const devs: string[] = parseEnvValue(process.env.DEVS ?? "");
 export const lang = formatLocale(process.env.LOCALE) || "en-US";

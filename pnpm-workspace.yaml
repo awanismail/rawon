@@ -1,12 +1,13 @@
 allowBuilds:
   "@swc/core": true
-  better-sqlite3: true
+  better-sqlite3: set this to true or false
   ffmpeg-static: true
   protobufjs: true
   puppeteer: true
 
 ignoredBuiltDependencies:
   - puppeteer
+  - better-sqlite3
 
 minimumReleaseAgeExclude:
   - "@puppeteer/browsers"
@@ -31,7 +32,6 @@ minimumReleaseAgeExclude:
 
 onlyBuiltDependencies:
   - "@swc/core"
-  - better-sqlite3
   - ffmpeg-static
   - protobufjs
   - unrs-resolver
