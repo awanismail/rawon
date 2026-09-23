@@ -698,11 +698,11 @@ export class ReadyListener extends Listener<typeof Events.ClientReady> {
                     type = ActivityType.Listening;
                 }
 
-                return Object.assign(a, {
+                return {
                     name: await this.formatString(a.name),
                     type: a.type,
                     typeNumber: type,
-                });
+                };
             }),
         ).then((x) => x[activityNumber]);
 
@@ -720,40 +720,7 @@ export class ReadyListener extends Listener<typeof Events.ClientReady> {
     }
 
     private async doPresence(): Promise<Presence | undefined> {
-        const client = this.currentClient;
         try {
-            if (this.container.config.isMultiBot) {
-                const primaryBot = client.multiBotManager.getPrimaryBot();
-                if (primaryBot && primaryBot !== client && primaryBot.user) {
-                    const syncPresence = async (): Promise<void> => {
-                        try {
-                            const primaryPresence = primaryBot.user?.presence;
-                            if (primaryPresence) {
-                                const status =
-                                    primaryPresence.status === "offline"
-                                        ? "invisible"
-                                        : primaryPresence.status;
-                                await client.user?.setPresence({
-                                    activities: primaryPresence.activities.map((activity) => ({
-                                        name: activity.name,
-                                        type: activity.type,
-                                        url: activity.url ?? undefined,
-                                    })),
-                                    status,
-                                });
-                            }
-                        } catch (error) {
-                            this.container.logger.error("PRESENCE_SYNC_ERR:", error);
-                        }
-                    };
-
-                    await syncPresence();
-
-                    setInterval(syncPresence, this.container.config.presenceData.interval);
-                    return undefined;
-                }
-            }
-
             return await this.setPresence(false);
         } catch (error) {
             if ((error as Error).message !== "Shards are still being spawned.") {
@@ -761,15 +728,10 @@ export class ReadyListener extends Listener<typeof Events.ClientReady> {
             }
             return undefined;
         } finally {
-            if (
-                !this.container.config.isMultiBot ||
-                client.multiBotManager.getPrimaryBot() === client
-            ) {
-                setInterval(
-                    async () => this.setPresence(true),
-                    this.container.config.presenceData.interval,
-                );
-            }
+            setInterval(
+                async () => this.setPresence(true),
+                this.container.config.presenceData.interval,
+            );
         }
     }
 }
