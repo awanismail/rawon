@@ -5,6 +5,7 @@ import {
     discordTokens,
     isMultiBot,
     isProd,
+    mainPrefixAutoAssigned,
     mainPrefixes,
 } from "../../config/index.js";
 import { Rawon } from "../../structures/Rawon.js";
@@ -152,6 +153,14 @@ export class MultiBotLauncher {
             return;
         }
         log.info(`[MultiBot] Starting ${discordTokens.length} bot instances...`);
+
+        if (mainPrefixAutoAssigned) {
+            log.warn(
+                `[MultiBot] MAIN_PREFIX is not set with ${discordTokens.length} bots — auto-assigned prefixes: ${mainPrefixes
+                    .map((prefix, index) => `#${index + 1} "${prefix}"`)
+                    .join(", ")}. Set MAIN_PREFIX to override.`,
+            );
+        }
 
         for (let i = 0; i < discordTokens.length; i++) {
             const token = discordTokens[i];

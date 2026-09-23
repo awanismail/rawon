@@ -73,8 +73,15 @@ const rawMainPrefixes = (process.env.MAIN_PREFIX ?? "")
     .split(",")
     .map((prefix) => prefix.trim())
     .filter((prefix) => prefix.length > 0);
+const alphabet = "abcdefghijklmnopqrstuvwxyz";
+const autoAssignPrefixes = rawMainPrefixes.length === 0 && isMultiBot && discordTokens.length > 1;
 export const mainPrefixes: string[] =
-    rawMainPrefixes.length > 0 ? rawMainPrefixes : [fallbackMainPrefix];
+    rawMainPrefixes.length > 0
+        ? rawMainPrefixes
+        : Array.from({ length: isMultiBot ? discordTokens.length : 1 }, (_, i) =>
+              i === 0 ? fallbackMainPrefix : fallbackMainPrefix + (alphabet[i] ?? String(i)),
+          );
+export const mainPrefixAutoAssigned = autoAssignPrefixes;
 export const mainPrefix = mainPrefixes[0];
 export const mainServer = parseEnvValue(process.env.MAIN_SERVER ?? "");
 export const devs: string[] = parseEnvValue(process.env.DEVS ?? "");
