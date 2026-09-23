@@ -75,7 +75,7 @@ New methods on `SQLiteDataManager` (all writes queued through `OperationManager`
 
 The favorites row is created lazily via an `ensureFavorites(userId)` helper the first time a user favorites anything.
 
-Shared logic (name validation, duplicate checks, limit enforcement, `ensureFavorites`) lives in one helper module (e.g. `src/utils/functions/playlist.ts`) so both commands stay thin.
+Shared logic (name validation, duplicate checks, limit enforcement, `ensureFavorites`) lives in a single helper module `src/utils/functions/playlist.ts` so both commands stay thin.
 
 ## Commands
 
@@ -90,7 +90,7 @@ Name `playlist`, aliases `pl`. Slash: subcommands. Prefix: first token is the su
 | `rename <from> <to>` | Rename; favorites row cannot be renamed |
 | `list` | Embed of playlists with track counts and creation dates |
 | `info <name>` | Track list via `ButtonPagination` (10 per page, like `QueueCommand`) |
-| `add [name] <query\|URL>` | Resolve one song via existing `searchTrack` and append. Empty name → `StringSelectMenu` of the user's playlists to pick a destination. Duplicate URL rejected with the existing position |
+| `add [name] <query\|URL>` | Resolve one song via existing `searchTrack` and append. Empty name → `StringSelectMenu` of the user's playlists to pick a destination. Duplicate URL rejected with the existing position. A collection/playlist URL is rejected here with a hint to use `import` |
 | `remove <name> <index>` | Remove track at index (as shown by `info`) |
 | `play [name]` | Enqueue all tracks (guards `@inVC @validVC @sameVC @useRequestChannel`; enqueue via the existing `handleVideos` path). Empty name → select menu |
 | `save <name>` | Snapshot the currently playing queue into a **new** playlist — the name must not already exist (no silent overwrite or append) |
