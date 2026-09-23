@@ -320,6 +320,7 @@ export type GuildData = {
         loopMode: LoopMode;
         shuffle: boolean;
         autoplay: boolean;
+        alwaysOn: boolean;
         volume: number;
         filters: Record<string, boolean>;
     };

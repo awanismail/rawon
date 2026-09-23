@@ -165,6 +165,13 @@ export class SQLiteDataManager<T extends Record<string, GuildData> = Record<stri
             `);
         }
 
+        const hasAlwaysOnColumn = playerStateInfo.some((col) => col.name === "always_on");
+        if (!hasAlwaysOnColumn) {
+            this.db.exec(`
+                ALTER TABLE player_states ADD COLUMN always_on INTEGER DEFAULT 0;
+            `);
+        }
+
         this.db.exec(`
             CREATE TABLE IF NOT EXISTS bot_settings (
                 id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -545,6 +552,7 @@ export class SQLiteDataManager<T extends Record<string, GuildData> = Record<stri
                   loop_mode: string;
                   shuffle: number;
                   autoplay: number;
+                  always_on: number | null;
                   volume: number;
                   filters_json: string | null;
               }
@@ -567,6 +575,7 @@ export class SQLiteDataManager<T extends Record<string, GuildData> = Record<stri
             loopMode: (result.loop_mode ?? "OFF") as "OFF" | "SONG" | "QUEUE",
             shuffle: result.shuffle === 1,
             autoplay: result.autoplay === 1,
+            alwaysOn: result.always_on === 1,
             volume: result.volume ?? this.botSettings.defaultVolume,
             filters,
         };
@@ -590,12 +599,13 @@ export class SQLiteDataManager<T extends Record<string, GuildData> = Record<stri
             guildStmt.run(guildId, null, 0, null, null);
 
             const stmt = this.db.prepare(`
-                INSERT INTO player_states (guild_id, bot_id, loop_mode, shuffle, autoplay, volume, filters_json)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO player_states (guild_id, bot_id, loop_mode, shuffle, autoplay, always_on, volume, filters_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(guild_id, bot_id) DO UPDATE SET
                     loop_mode = excluded.loop_mode,
                     shuffle = excluded.shuffle,
                     autoplay = excluded.autoplay,
+                    always_on = excluded.always_on,
                     volume = excluded.volume,
                     filters_json = excluded.filters_json
             `);
@@ -606,6 +616,7 @@ export class SQLiteDataManager<T extends Record<string, GuildData> = Record<stri
                 playerState.loopMode,
                 playerState.shuffle ? 1 : 0,
                 playerState.autoplay ? 1 : 0,
+                playerState.alwaysOn ? 1 : 0,
                 playerState.volume,
                 JSON.stringify(playerState.filters),
             );

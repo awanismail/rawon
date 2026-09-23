@@ -90,8 +90,13 @@ export class ServerQueue {
     public loopMode: LoopMode = "OFF";
     public shuffle = false;
     public autoPlay = false;
+    public alwaysOn = false;
     public filters: Partial<Record<keyof typeof filterArgs, boolean>> = {};
     public seekOffset = 0;
+
+    public get effectiveAlwaysOn(): boolean {
+        return this.client.data.botSettings.alwaysOn || this.alwaysOn;
+    }
 
     private _volume = BOT_SETTINGS_DEFAULTS.defaultVolume;
     private _lastVSUpdateMsg: Snowflake | null = null;
@@ -425,6 +430,7 @@ export class ServerQueue {
                 loopMode?: string;
                 shuffle?: boolean;
                 autoplay?: boolean;
+                alwaysOn?: boolean;
                 volume?: number;
                 filters?: Record<string, boolean>;
             } | null = null;
@@ -467,13 +473,14 @@ export class ServerQueue {
                 this.loopMode = (savedState.loopMode as typeof this.loopMode) ?? "OFF";
                 this.shuffle = savedState.shuffle ?? false;
                 this.autoPlay = savedState.autoplay ?? false;
+                this.alwaysOn = savedState.alwaysOn ?? false;
                 this._volume = savedState.volume ?? this.resolvedDefaultVolume;
                 this.filters = (savedState.filters ?? {}) as Partial<
                     Record<keyof typeof filterArgs, boolean>
                 >;
                 this.client.logger.debug(
                     `✅ Loaded saved player state for guild ${this.textChannel.guild.name}: ` +
-                        `loop=${this.loopMode}, shuffle=${this.shuffle}, autoPlay=${this.autoPlay}, volume=${this._volume}, filters=${JSON.stringify(this.filters)}`,
+                        `loop=${this.loopMode}, shuffle=${this.shuffle}, autoPlay=${this.autoPlay}, alwaysOn=${this.alwaysOn}, volume=${this._volume}, filters=${JSON.stringify(this.filters)}`,
                 );
             } else {
                 this.client.logger.debug(
@@ -509,6 +516,7 @@ export class ServerQueue {
             loopMode: this.loopMode,
             shuffle: this.shuffle,
             autoplay: this.autoPlay,
+            alwaysOn: this.alwaysOn,
             volume: this._volume,
             filters: this.filters as Record<string, boolean>,
         };
