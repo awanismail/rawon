@@ -408,7 +408,7 @@ export class VoiceStateUpdateListener extends Listener<typeof Events.VoiceStateU
             return;
         }
 
-        if (queue.client.data.botSettings.alwaysOn) {
+        if (queue.effectiveAlwaysOn) {
             return;
         }
 
@@ -622,7 +622,7 @@ export class VoiceStateUpdateListener extends Listener<typeof Events.VoiceStateU
         const __ = i18n__(client, guild);
         const __mf = i18n__mf(client, guild);
 
-        if (client.data.botSettings.alwaysOn) {
+        if (queue.effectiveAlwaysOn) {
             queue.player.pause();
             return;
         }
@@ -703,7 +703,7 @@ export class VoiceStateUpdateListener extends Listener<typeof Events.VoiceStateU
         const __ = i18n__(client, guild);
         const __mf = i18n__mf(client, guild);
 
-        if (client.data.botSettings.alwaysOn) {
+        if (queue.effectiveAlwaysOn) {
             queue.player.pause();
             return;
         }

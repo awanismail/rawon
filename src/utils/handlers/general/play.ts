@@ -89,7 +89,7 @@ export async function play(
 
         void queue.client.requestChannelManager.updatePlayerMessage(guild);
 
-        if (queue.client.data.botSettings.alwaysOn) {
+        if (queue.effectiveAlwaysOn) {
             queue.client.debugLog.logData(
                 "info",
                 "PLAY_HANDLER",
