@@ -51,7 +51,7 @@ Example: `!requestchannel #music-requests`
 
 ### Docker Setup (Recommended)
 
-This fork ships a `docker-compose.yaml` that **builds the image from your local source**, so all fork features (playlists, favorites, leaderboard, `nada` prefix) are included. Deploying is three steps:
+This fork ships a `docker-compose.yml` that **builds the image from your local source**, so all fork features (playlists, favorites, leaderboard, `nada` prefix) are included. Deploying is three steps:
 
 1. Create a `.env` file with your configuration (copy from `.env.example`); `DISCORD_TOKEN` is required
 2. Optionally create `dev.env` from `dev.env.example` — the compose file treats it as optional
@@ -68,7 +68,7 @@ Rebuild after pulling new code with `docker compose up -d --build`. The named vo
 
 #### Using the upstream image instead
 
-To run the unmodified upstream bot rather than this fork's build, replace the `build:`/`image:` block in `docker-compose.yaml` with `image: ghcr.io/stegripe/rawon:latest`:
+To run the unmodified upstream bot rather than this fork's build, replace the `build:`/`image:` block in `docker-compose.yml` with `image: ghcr.io/stegripe/rawon:latest`:
 ```yaml
 services:
   rawon:

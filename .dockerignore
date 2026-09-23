@@ -4,7 +4,7 @@
 
 # CI/CD & Docker meta
 Dockerfile
-docker-compose.yaml
+docker-compose.yml
 .dockerignore
 
 # IDE & Editor
