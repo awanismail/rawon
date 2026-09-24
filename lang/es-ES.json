@@ -241,7 +241,8 @@
                 "slashStateFilterDescription": "El filtro de canción que será {state, select, enable {activado} other {desactivado}}",
                 "slashStatusDescription": "Comprobar el estado actual de los filtros de canción",
                 "slashStatusFilterDescription": "El filtro de canción que desea comprobar",
-                "specifyFilter": "Por favor, especifique el filtro de canción."
+                "specifyFilter": "Por favor, especifique el filtro de canción.",
+                "notAvailableInMode": "⚠️ **|** Filter {filter} is not available in musicify mode."
             },
             "lyrics": {
                 "description": "Muestra la letra de una canción",
@@ -274,7 +275,9 @@
                 "description": "Reproduce algo de música",
                 "noSongData": "Este URL no tiene datos de canciones.",
                 "slashQueryDescription": "Canción a reproducir",
-                "usage": "{prefix}play <consulta / url>"
+                "usage": "{prefix}play <consulta / url>",
+                "youtubeNotSupportedMode": "❌ **|** youtube.com links are not supported in musicify mode. Use YouTube Music (music.youtube.com) links instead.",
+                "pluginSourceUnavailable": "❌ **|** {platform} links can only be played in musicify mode (Lavalink). Switch the engine mode or use another source."
             },
             "queue": {
                 "description": "Muestra la cola de reproducción"
@@ -390,6 +393,19 @@
                 "slashStatusDescription": "Mostrar el canal de solicitudes actual",
                 "slashChannelDescription": "El canal a establecer como canal de solicitudes",
                 "usage": "{prefix}requestchannel <set | remove | status> [channel]"
+            },
+            "chatplay": {
+                "description": "Set up or manage ChatPlay (song request channel) for this server",
+                "usage": "{prefix}chatplay set <channel> [chat|command] [smartfilter on/off] [autodelete on/off] [slowmode on/off] [pin on/off] | remove | status",
+                "slashSetDescription": "Set the ChatPlay channel for this server",
+                "slashChannelDescription": "The channel to use for ChatPlay",
+                "slashModeDescription": "How requests are accepted: chat messages or commands only",
+                "slashSmartFilterDescription": "Reject chat-only messages with the smart filter",
+                "slashAutoDeleteDescription": "Delete user song requests shortly after processing",
+                "slashSlowmodeDescription": "Enable slowmode on the ChatPlay channel",
+                "slashPinDescription": "Pin the player message in the channel",
+                "slashRemoveDescription": "Remove the ChatPlay channel",
+                "slashStatusDescription": "Show the current ChatPlay configuration"
             }
         }
     },
@@ -464,7 +480,17 @@
         "skippedReasonUnavailable": "privado/eliminado o no disponible",
         "skippedReasonUnresolved": "no se pudo vincular con una canción reproducible",
         "skippedReasonSkipped": "duplicado, privado/eliminado o no disponible",
-        "resolvingSong": "Resolviendo la canción, espera…"
+        "resolvingSong": "Resolviendo la canción, espera…",
+        "filteredChat": "💬 **|** That message looks like chat, not a song request — send a song title or link, or use a command.",
+        "suggestions": "Suggested songs",
+        "modeLabel": "Request mode",
+        "modeChat": "Chat",
+        "modeCommand": "Command only",
+        "smartFilter": "Smart filter",
+        "autoDelete": "Auto-delete requests",
+        "slowmode": "Slowmode",
+        "pinPlayer": "Pin player",
+        "rateLimited": "⏳ **|** You are requesting songs too quickly. Please wait a moment and try again."
     },
     "reusable": {
         "invalidUsage": "Uso inválido, por favor usa {prefix} {name} para más información.",

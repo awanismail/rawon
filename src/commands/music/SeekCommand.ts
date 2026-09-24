@@ -1,4 +1,3 @@
-import { type AudioPlayerPlayingState, AudioPlayerStatus } from "@discordjs/voice";
 import { ApplyOptions } from "@sapphire/decorators";
 import { type Command } from "@sapphire/framework";
 import { type CommandContext, ContextCommand } from "@stegripe/command-context";
@@ -59,14 +58,14 @@ export class SeekCommand extends ContextCommand {
             return;
         }
 
-        if (queue.player.state.status !== AudioPlayerStatus.Playing) {
+        if (!queue.playing) {
             await ctx.reply({
                 embeds: [createEmbed("warn", __("commands.music.seek.noPlaying"))],
             });
             return;
         }
 
-        const song = (queue.player.state as AudioPlayerPlayingState).resource.metadata as QueueSong;
+        const song = queue.getCurrentSong() as QueueSong;
 
         const canControl = await hasMusicControlPermission({
             client,

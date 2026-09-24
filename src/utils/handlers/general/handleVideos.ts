@@ -1,5 +1,4 @@
 import { setTimeout } from "node:timers";
-import { joinVoiceChannel } from "@discordjs/voice";
 import {
     ChannelType,
     type Guild,
@@ -14,7 +13,6 @@ import { ServerQueue, type ServerQueueTextChannel } from "../../../structures/Se
 import { type PlaylistMetadata, type Song } from "../../../typings/index.js";
 import { chunk } from "../../functions/chunk.js";
 import { createEmbed } from "../../functions/createEmbed.js";
-import { createVoiceAdapter } from "../../functions/createVoiceAdapter.js";
 import { formatBoldMarkdownLink, formatMarkdownText } from "../../functions/formatMarkdown.js";
 import { i18n__, i18n__mf } from "../../functions/i18n.js";
 import { formatAddedPlaylistNotice } from "../../functions/playlistQueueNotice.js";
@@ -379,23 +377,7 @@ export async function handleVideos(
             throw new Error("Guild is null");
         }
 
-        const adapterCreator = createVoiceAdapter(client, ctx.guild.id);
-
-        client.logger.debug(
-            `[MultiBot] ${client.user?.tag} creating voice connection using custom adapter for channel ${voiceChannel.id}`,
-        );
-
-        const connection = joinVoiceChannel({
-            adapterCreator,
-            channelId: voiceChannel.id,
-            guildId: ctx.guild.id,
-            selfDeaf: true,
-            group: client.user?.id ?? "default",
-        }).on("debug", (message) => {
-            client.logger.debug(message);
-        });
-
-        serverQueue.connection = connection;
+        serverQueue.engine.connect(ctx.guild, voiceChannel.id, serverQueue.textChannel.id);
 
         client.debugLog.logData(
             "info",

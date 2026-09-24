@@ -12,6 +12,7 @@ import { type CommandContext as LocalCommandContext } from "../../structures/Com
 import { type Rawon } from "../../structures/Rawon.js";
 import { type GuildData } from "../../typings/index.js";
 import { inVC, sameVC, validVC } from "../../utils/decorators/MusicUtil.js";
+import { LL_SUPPORTED_FILTERS } from "../../utils/engines/lavalink/index.js";
 import { createEmbed } from "../../utils/functions/createEmbed.js";
 import { filterArgs } from "../../utils/functions/ffmpegArgs.js";
 import { getEffectivePrefix } from "../../utils/functions/getEffectivePrefix.js";
@@ -135,6 +136,19 @@ export class FilterCommand extends ContextCommand {
 
             const queue = ctx.guild?.queue;
             const newState = subcmd === "enable";
+
+            if (queue?.engine.mode === "musicify" && !LL_SUPPORTED_FILTERS.has(filter)) {
+                return ctx.reply({
+                    embeds: [
+                        createEmbed(
+                            "warn",
+                            __mf("commands.music.filter.notAvailableInMode", {
+                                filter: `**\`${filter}\`**`,
+                            }),
+                        ),
+                    ],
+                });
+            }
 
             if (queue) {
                 const appliedWithSeek = queue.setFilter(filter, newState);

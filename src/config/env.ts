@@ -94,3 +94,56 @@ export const devtoolsPort =
 export const debugMode = process.env.DEBUG_MODE?.toLowerCase() === "yes";
 
 export const stegripeApiUrl = "https://api.stegripe.org";
+
+// --- Mode playback (DESIGN-MERGE.md K2): `rawon` (default) atau `musicify` (Lavalink v4). ---
+export type EngineModeValue = "rawon" | "musicify";
+
+const rawEngineMode = process.env.ENGINE_MODE?.trim().toLowerCase();
+export const engineMode: EngineModeValue = rawEngineMode === "musicify" ? "musicify" : "rawon";
+
+export type LavalinkNodeConfig = {
+    name: string;
+    host: string;
+    port: number;
+    password: string;
+    secure: boolean;
+};
+
+function buildLavalinkNodes(): LavalinkNodeConfig[] {
+    const nodes: LavalinkNodeConfig[] = [];
+
+    if (process.env.LAVALINK_HOST && process.env.LAVALINK_PASSWORD) {
+        nodes.push({
+            host: process.env.LAVALINK_HOST,
+            password: process.env.LAVALINK_PASSWORD,
+            port: Number(process.env.LAVALINK_PORT || 443),
+            secure: process.env.LAVALINK_SECURE !== "false",
+            name: process.env.LAVALINK_NAME || "Main",
+        });
+    }
+
+    if (process.env.LAVALINK_BACKUP_HOST && process.env.LAVALINK_BACKUP_PASSWORD) {
+        nodes.push({
+            host: process.env.LAVALINK_BACKUP_HOST,
+            password: process.env.LAVALINK_BACKUP_PASSWORD,
+            port: Number(process.env.LAVALINK_BACKUP_PORT || 443),
+            secure: process.env.LAVALINK_BACKUP_SECURE !== "false",
+            name: process.env.LAVALINK_BACKUP_NAME || "Backup",
+        });
+    }
+
+    return nodes;
+}
+
+export const lavalinkNodes: LavalinkNodeConfig[] = buildLavalinkNodes();
+
+export const lavalinkDefaultSearchPlatform = "ytmsearch";
+export const lavalinkRestVersion = "v4";
+
+if (engineMode === "musicify" && lavalinkNodes.length === 0) {
+    console.error(
+        "ENGINE_MODE=musicify requires at least one Lavalink node. " +
+            "Set LAVALINK_HOST and LAVALINK_PASSWORD (or switch ENGINE_MODE to rawon). Stopping the bot...",
+    );
+    process.exit(1);
+}

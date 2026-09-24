@@ -1,4 +1,3 @@
-import { type AudioPlayerPlayingState } from "@discordjs/voice";
 import { ApplyOptions } from "@sapphire/decorators";
 import { type Command } from "@sapphire/framework";
 import { type CommandContext, ContextCommand } from "@stegripe/command-context";
@@ -46,8 +45,7 @@ export class QueueCommand extends ContextCommand {
         const __ = i18n__(client, ctx.guild);
         const __mf = i18n__mf(client, ctx.guild);
 
-        const np = (ctx.guild?.queue?.player.state as AudioPlayerPlayingState).resource
-            .metadata as QueueSong;
+        const np = ctx.guild?.queue?.getCurrentSong() as QueueSong;
         const full = ctx.guild?.queue?.songs.sortByIndex() as SongManager;
         const songs =
             ctx.guild?.queue?.loopMode === "QUEUE"

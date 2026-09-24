@@ -1,11 +1,9 @@
-import { type AudioPlayerPlayingState } from "@discordjs/voice";
 import { ApplyOptions } from "@sapphire/decorators";
 import { type Command } from "@sapphire/framework";
 import { type CommandContext, ContextCommand } from "@stegripe/command-context";
 import { type GuildMember, PermissionFlagsBits, type SlashCommandBuilder } from "discord.js";
 import i18n from "../../config/index.js";
 import { type Rawon } from "../../structures/Rawon.js";
-import { type QueueSong } from "../../typings/index.js";
 import {
     haveQueue,
     inVC,
@@ -54,11 +52,7 @@ export class StopCommand extends ContextCommand {
 
         const q = ctx.guild?.queue;
         if (q) {
-            const currentSong = (
-                q.player.state as
-                    | (AudioPlayerPlayingState & { resource?: { metadata?: QueueSong } })
-                    | undefined
-            )?.resource?.metadata;
+            const currentSong = q.getCurrentSong();
             const canControl = await hasMusicControlPermission({
                 client,
                 guild: ctx.guild as NonNullable<typeof ctx.guild>,

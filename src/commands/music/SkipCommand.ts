@@ -1,4 +1,3 @@
-import { type AudioPlayerPlayingState } from "@discordjs/voice";
 import { ApplyOptions } from "@sapphire/decorators";
 import { type Command } from "@sapphire/framework";
 import { type CommandContext, ContextCommand } from "@stegripe/command-context";
@@ -62,7 +61,7 @@ export class SkipCommand extends ContextCommand {
             return;
         }
 
-        const song = (queue.player.state as AudioPlayerPlayingState).resource.metadata as QueueSong;
+        const song = queue.getCurrentSong() as QueueSong;
 
         const canControl = await hasMusicControlPermission({
             client,
@@ -126,7 +125,7 @@ export class SkipCommand extends ContextCommand {
         if (!queue.playing) {
             queue.playing = true;
         }
-        queue.player.stop(true);
+        queue.stopCurrent();
         await ctx
             .reply({
                 embeds: [

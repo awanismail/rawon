@@ -259,7 +259,7 @@ function createTarget(
     voiceChannelId: Snowflake,
     originGuildId: Snowflake | null,
 ): MusicCommandTarget {
-    const queueVoiceChannelId = guild.queue?.connection?.joinConfig.channelId ?? null;
+    const queueVoiceChannelId = guild.queue?.voiceChannelId ?? null;
     const hasQueueForVoiceChannel = queueVoiceChannelId === voiceChannelId;
     const tokenIndex = client.multiBotManager.getBotByClient(client)?.tokenIndex ?? 0;
 

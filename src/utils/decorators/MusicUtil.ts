@@ -94,9 +94,7 @@ export const sameVC = createCmdExecuteDecorator((ctx) => {
         return true;
     }
 
-    const botVc =
-        thisBotGuild.queue?.connection?.joinConfig.channelId ??
-        thisBotGuild.members.me.voice.channel.id;
+    const botVc = thisBotGuild.queue?.voiceChannelId ?? thisBotGuild.members.me.voice.channel.id;
     if (member?.voice.channel?.id !== botVc) {
         void ctx.reply({
             embeds: [createEmbed("warn", __("utils.musicDecorator.sameVC"))],

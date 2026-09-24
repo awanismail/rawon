@@ -241,7 +241,8 @@
                 "slashStateFilterDescription": "Saringan lagu yang akan {state, select, enable {diaktifkan} other {dilumpuhkan}}",
                 "slashStatusDescription": "Semak status semasa saringan lagu",
                 "slashStatusFilterDescription": "Saringan lagu yang hendak disemak",
-                "specifyFilter": "Sila nyatakan saringan lagu."
+                "specifyFilter": "Sila nyatakan saringan lagu.",
+                "notAvailableInMode": "⚠️ **|** Filter {filter} is not available in musicify mode."
             },
             "lyrics": {
                 "description": "Paparkan lirik lagu",
@@ -274,7 +275,9 @@
                 "description": "Jom layan muzik",
                 "noSongData": "Pautan tersebut tidak mempunyai data lagu.",
                 "slashQueryDescription": "Masukkan carian",
-                "usage": "{prefix}play <carian | url>"
+                "usage": "{prefix}play <carian | url>",
+                "youtubeNotSupportedMode": "❌ **|** youtube.com links are not supported in musicify mode. Use YouTube Music (music.youtube.com) links instead.",
+                "pluginSourceUnavailable": "❌ **|** {platform} links can only be played in musicify mode (Lavalink). Switch the engine mode or use another source."
             },
             "queue": {
                 "description": "Tunjukkan senarai giliran"
@@ -390,6 +393,19 @@
                 "slashStatusDescription": "Paparkan saluran permintaan semasa",
                 "slashChannelDescription": "Saluran yang mahu dijadikan saluran permintaan",
                 "usage": "{prefix}requestchannel <set | remove | status> [saluran]"
+            },
+            "chatplay": {
+                "description": "Set up or manage ChatPlay (song request channel) for this server",
+                "usage": "{prefix}chatplay set <channel> [chat|command] [smartfilter on/off] [autodelete on/off] [slowmode on/off] [pin on/off] | remove | status",
+                "slashSetDescription": "Set the ChatPlay channel for this server",
+                "slashChannelDescription": "The channel to use for ChatPlay",
+                "slashModeDescription": "How requests are accepted: chat messages or commands only",
+                "slashSmartFilterDescription": "Reject chat-only messages with the smart filter",
+                "slashAutoDeleteDescription": "Delete user song requests shortly after processing",
+                "slashSlowmodeDescription": "Enable slowmode on the ChatPlay channel",
+                "slashPinDescription": "Pin the player message in the channel",
+                "slashRemoveDescription": "Remove the ChatPlay channel",
+                "slashStatusDescription": "Show the current ChatPlay configuration"
             }
         }
     },
@@ -464,7 +480,17 @@
         "skippedReasonUnavailable": "private/deleted atau tidak tersedia",
         "skippedReasonUnresolved": "gagal dipadankan dengan lagu yang boleh dimainkan",
         "skippedReasonSkipped": "duplikat, private/deleted, atau tidak tersedia",
-        "resolvingSong": "Sedang menyelesaikan lagu, sila tunggu…"
+        "resolvingSong": "Sedang menyelesaikan lagu, sila tunggu…",
+        "filteredChat": "💬 **|** That message looks like chat, not a song request — send a song title or link, or use a command.",
+        "suggestions": "Suggested songs",
+        "modeLabel": "Request mode",
+        "modeChat": "Chat",
+        "modeCommand": "Command only",
+        "smartFilter": "Smart filter",
+        "autoDelete": "Auto-delete requests",
+        "slowmode": "Slowmode",
+        "pinPlayer": "Pin player",
+        "rateLimited": "⏳ **|** You are requesting songs too quickly. Please wait a moment and try again."
     },
     "reusable": {
         "invalidUsage": "Penggunaan tidak sah, sila gunakan {prefix} {name} untuk maklumat lanjut.",

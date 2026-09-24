@@ -241,7 +241,8 @@
                 "slashStateFilterDescription": "{state, select, enable {활성화} other {비활성화}}할 필터",
                 "slashStatusDescription": "노래 필터의 현재 상태 확인",
                 "slashStatusFilterDescription": "확인하고 싶은 노래 필터",
-                "specifyFilter": "노래 필터를 지정해주세요."
+                "specifyFilter": "노래 필터를 지정해주세요.",
+                "notAvailableInMode": "⚠️ **|** Filter {filter} is not available in musicify mode."
             },
             "lyrics": {
                 "description": "노래의 가사 보기",
@@ -274,7 +275,9 @@
                 "description": "음악 재생",
                 "noSongData": "해당 URL에는 노래 데이터가 없어요.",
                 "slashQueryDescription": "검색어",
-                "usage": "{prefix}play <검색어 | URL>"
+                "usage": "{prefix}play <검색어 | URL>",
+                "youtubeNotSupportedMode": "❌ **|** youtube.com links are not supported in musicify mode. Use YouTube Music (music.youtube.com) links instead.",
+                "pluginSourceUnavailable": "❌ **|** {platform} links can only be played in musicify mode (Lavalink). Switch the engine mode or use another source."
             },
             "queue": {
                 "description": "대기열 목록 보기"
@@ -390,6 +393,19 @@
                 "slashStatusDescription": "현재 요청 채널 보기",
                 "slashChannelDescription": "요청 채널로 설정할 채널",
                 "usage": "{prefix}requestchannel <set | remove | status> [채널]"
+            },
+            "chatplay": {
+                "description": "Set up or manage ChatPlay (song request channel) for this server",
+                "usage": "{prefix}chatplay set <channel> [chat|command] [smartfilter on/off] [autodelete on/off] [slowmode on/off] [pin on/off] | remove | status",
+                "slashSetDescription": "Set the ChatPlay channel for this server",
+                "slashChannelDescription": "The channel to use for ChatPlay",
+                "slashModeDescription": "How requests are accepted: chat messages or commands only",
+                "slashSmartFilterDescription": "Reject chat-only messages with the smart filter",
+                "slashAutoDeleteDescription": "Delete user song requests shortly after processing",
+                "slashSlowmodeDescription": "Enable slowmode on the ChatPlay channel",
+                "slashPinDescription": "Pin the player message in the channel",
+                "slashRemoveDescription": "Remove the ChatPlay channel",
+                "slashStatusDescription": "Show the current ChatPlay configuration"
             }
         }
     },
@@ -464,7 +480,17 @@
         "skippedReasonUnavailable": "비공개/삭제됨 또는 사용할 수 없음",
         "skippedReasonUnresolved": "재생 가능한 곡으로 매칭하지 못함",
         "skippedReasonSkipped": "중복, 비공개/삭제됨 또는 사용할 수 없음",
-        "resolvingSong": "노래를 불러오는 중이에요. 잠시만 기다려 주세요…"
+        "resolvingSong": "노래를 불러오는 중이에요. 잠시만 기다려 주세요…",
+        "filteredChat": "💬 **|** That message looks like chat, not a song request — send a song title or link, or use a command.",
+        "suggestions": "Suggested songs",
+        "modeLabel": "Request mode",
+        "modeChat": "Chat",
+        "modeCommand": "Command only",
+        "smartFilter": "Smart filter",
+        "autoDelete": "Auto-delete requests",
+        "slowmode": "Slowmode",
+        "pinPlayer": "Pin player",
+        "rateLimited": "⏳ **|** You are requesting songs too quickly. Please wait a moment and try again."
     },
     "reusable": {
         "invalidUsage": "잘못된 사용법이에요. {prefix} {name}으로 자세한 정보를 확인하세요.",

@@ -1,4 +1,3 @@
-import { type AudioPlayerPlayingState, type AudioResource } from "@discordjs/voice";
 import { ApplyOptions } from "@sapphire/decorators";
 import { type Command } from "@sapphire/framework";
 import { type CommandContext, ContextCommand } from "@stegripe/command-context";
@@ -6,7 +5,7 @@ import { PermissionFlagsBits, type SlashCommandBuilder } from "discord.js";
 import i18n from "../../config/index.js";
 import { type CommandContext as LocalCommandContext } from "../../structures/CommandContext.js";
 import { type Rawon } from "../../structures/Rawon.js";
-import { type LyricsAPIResult, type QueueSong } from "../../typings/index.js";
+import { type LyricsAPIResult } from "../../typings/index.js";
 import { chunk } from "../../utils/functions/chunk.js";
 import { createEmbed } from "../../utils/functions/createEmbed.js";
 import { i18n__, i18n__mf } from "../../utils/functions/i18n.js";
@@ -48,11 +47,7 @@ export class LyricsCommand extends ContextCommand {
         const __ = i18n__(client, ctx.guild);
         const __mf = i18n__mf(client, ctx.guild);
 
-        const currentSong = (
-            (ctx.guild?.queue?.player.state as AudioPlayerPlayingState).resource as
-                | AudioResource
-                | undefined
-        )?.metadata as QueueSong | undefined;
+        const currentSong = ctx.guild?.queue?.getCurrentSong() ?? undefined;
 
         const userQuery =
             localCtx.args.length > 0

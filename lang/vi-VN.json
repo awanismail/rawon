@@ -241,7 +241,8 @@
                 "slashStateFilterDescription": "Bộ lọc bài hát sẽ được {state, select, enable {bật} other {tắt}}",
                 "slashStatusDescription": "Kiểm tra trạng thái hiện tại của bộ lọc bài hát",
                 "slashStatusFilterDescription": "Bộ lọc bài hát mà bạn muốn kiểm tra",
-                "specifyFilter": "Vui lòng chỉ định bộ lọc bài hát."
+                "specifyFilter": "Vui lòng chỉ định bộ lọc bài hát.",
+                "notAvailableInMode": "⚠️ **|** Filter {filter} is not available in musicify mode."
             },
             "lyrics": {
                 "description": "Hiển thị lời bài hát",
@@ -274,7 +275,9 @@
                 "description": "Phát nhạc",
                 "noSongData": "URL không có dữ liệu bài hát.",
                 "slashQueryDescription": "Tìm kiếm truy vấn",
-                "usage": "{prefix}play <truy vấn | url>"
+                "usage": "{prefix}play <truy vấn | url>",
+                "youtubeNotSupportedMode": "❌ **|** youtube.com links are not supported in musicify mode. Use YouTube Music (music.youtube.com) links instead.",
+                "pluginSourceUnavailable": "❌ **|** {platform} links can only be played in musicify mode (Lavalink). Switch the engine mode or use another source."
             },
             "queue": {
                 "description": "Hiển thị danh sách hàng đợi"
@@ -390,6 +393,19 @@
                 "slashStatusDescription": "Hiển thị kênh yêu cầu hiện tại",
                 "slashChannelDescription": "Kênh để đặt làm kênh yêu cầu",
                 "usage": "{prefix}requestchannel <set | remove | status> [channel]"
+            },
+            "chatplay": {
+                "description": "Set up or manage ChatPlay (song request channel) for this server",
+                "usage": "{prefix}chatplay set <channel> [chat|command] [smartfilter on/off] [autodelete on/off] [slowmode on/off] [pin on/off] | remove | status",
+                "slashSetDescription": "Set the ChatPlay channel for this server",
+                "slashChannelDescription": "The channel to use for ChatPlay",
+                "slashModeDescription": "How requests are accepted: chat messages or commands only",
+                "slashSmartFilterDescription": "Reject chat-only messages with the smart filter",
+                "slashAutoDeleteDescription": "Delete user song requests shortly after processing",
+                "slashSlowmodeDescription": "Enable slowmode on the ChatPlay channel",
+                "slashPinDescription": "Pin the player message in the channel",
+                "slashRemoveDescription": "Remove the ChatPlay channel",
+                "slashStatusDescription": "Show the current ChatPlay configuration"
             }
         }
     },
@@ -464,7 +480,17 @@
         "skippedReasonUnavailable": "riêng tư/đã xóa hoặc không khả dụng",
         "skippedReasonUnresolved": "không thể khớp thành bài hát phát được",
         "skippedReasonSkipped": "trùng lặp, riêng tư/đã xóa hoặc không khả dụng",
-        "resolvingSong": "Đang phân giải bài hát, vui lòng đợi…"
+        "resolvingSong": "Đang phân giải bài hát, vui lòng đợi…",
+        "filteredChat": "💬 **|** That message looks like chat, not a song request — send a song title or link, or use a command.",
+        "suggestions": "Suggested songs",
+        "modeLabel": "Request mode",
+        "modeChat": "Chat",
+        "modeCommand": "Command only",
+        "smartFilter": "Smart filter",
+        "autoDelete": "Auto-delete requests",
+        "slowmode": "Slowmode",
+        "pinPlayer": "Pin player",
+        "rateLimited": "⏳ **|** You are requesting songs too quickly. Please wait a moment and try again."
     },
     "reusable": {
         "invalidUsage": "Cách sử dụng không hợp lệ, vui lòng nhập {prefix} {name} để biết thêm thông tin.",

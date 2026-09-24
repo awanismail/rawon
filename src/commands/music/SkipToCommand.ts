@@ -1,4 +1,3 @@
-import { type AudioPlayerPlayingState, AudioPlayerStatus } from "@discordjs/voice";
 import { ApplyOptions } from "@sapphire/decorators";
 import { type Command } from "@sapphire/framework";
 import { type CommandContext, ContextCommand } from "@stegripe/command-context";
@@ -125,13 +124,13 @@ export class SkipToCommand extends ContextCommand {
             return;
         }
 
-        if (queue.player.state.status !== AudioPlayerStatus.Playing) {
+        if (!queue.playing) {
             await ctx.reply({
                 embeds: [createEmbed("warn", __("utils.musicDecorator.notPlaying"))],
             });
             return;
         }
-        const np = (queue.player.state as AudioPlayerPlayingState).resource.metadata as QueueSong;
+        const np = queue.getCurrentSong() as QueueSong;
         const fullSongs = [...queue.songs.sortByIndex().values()];
         const songs =
             queue.loopMode === "QUEUE"

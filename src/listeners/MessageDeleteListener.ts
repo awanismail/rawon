@@ -28,23 +28,24 @@ export class MessageDeleteListener extends Listener<typeof Events.MessageDelete>
 
         if (requestChannelData?.messageId === message.id) {
             this.container.logger.info(
-                `Request channel player message (${message.id}) was deleted in guild ${guild.name} (${guild.id}). Cleaning up request channel...`,
+                `ChatPlay player message (${message.id}) was deleted in guild ${guild.name} (${guild.id}). Recreating...`,
             );
 
             this.container.debugLog.logData("info", "MESSAGE_DELETE_EVENT", [
                 ["MessageId", message.id],
                 ["Guild", `${guild.name}(${guild.id})`],
-                ["Reason", "Request channel player message deleted"],
+                ["Reason", "ChatPlay player message deleted — auto-recreate"],
             ]);
 
             try {
-                await client.requestChannelManager.setRequestChannel(guild, null);
+                await client.requestChannelManager.setPlayerMessageId(guild, null);
+                await client.requestChannelManager.createOrUpdatePlayerMessage(guild, true);
                 this.container.logger.info(
-                    `Cleaned up request channel data for guild ${guild.name} (${guild.id}) after player message deletion`,
+                    `Recreated ChatPlay player message for guild ${guild.name} (${guild.id})`,
                 );
             } catch (error) {
                 this.container.logger.error(
-                    `Failed to clean up request channel data for guild ${guild.id}:`,
+                    `Failed to recreate ChatPlay player message for guild ${guild.id}:`,
                     error,
                 );
             }

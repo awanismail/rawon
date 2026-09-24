@@ -1,4 +1,3 @@
-import { type AudioPlayerState, type AudioResource } from "@discordjs/voice";
 import { ApplyOptions } from "@sapphire/decorators";
 import { type Command } from "@sapphire/framework";
 import { type CommandContext, ContextCommand } from "@stegripe/command-context";
@@ -71,11 +70,7 @@ export class RemoveCommand extends ContextCommand {
             return;
         }
 
-        const np = (
-            queue.player.state as
-                | (AudioPlayerState & { resource: AudioResource | undefined })
-                | undefined
-        )?.resource?.metadata as QueueSong | undefined;
+        const np = queue.getCurrentSong();
         const full = (queue.songs as SongManager).sortByIndex();
         const displayedSongs =
             queue.loopMode === "QUEUE" ? full : full.filter((val) => val.index >= (np?.index ?? 0));
@@ -130,7 +125,7 @@ export class RemoveCommand extends ContextCommand {
             if (!queue.playing) {
                 queue.playing = true;
             }
-            queue.player.stop(true);
+            queue.stopCurrent();
         }
 
         const opening = __mf("commands.music.remove.songsRemoved", {

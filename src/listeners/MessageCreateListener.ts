@@ -11,6 +11,7 @@ import {
 } from "discord.js";
 import { CommandContext } from "../structures/CommandContext.js";
 import { type Rawon } from "../structures/Rawon.js";
+import { isLikelySongRequest } from "../utils/functions/chatPlayMessageFilter.js";
 import { createEmbed } from "../utils/functions/createEmbed.js";
 import { formatBoldCodeSpan } from "../utils/functions/formatCodeSpan.js";
 import { i18n__, i18n__mf } from "../utils/functions/i18n.js";
@@ -307,17 +308,46 @@ export class MessageCreateListener extends Listener<typeof Events.MessageCreate>
         const __ = i18n__(client, guild);
         const __mf = i18n__mf(client, guild);
 
+        const chatPlayOptions = client.requestChannelManager.getRequestChannelOptions(guild);
+
+        // Mode `command`: abaikan pesan teks biasa — hanya command yang diproses.
+        if (chatPlayOptions.mode === "command") {
+            return;
+        }
+
+        if (chatPlayOptions.smartFilter && !isLikelySongRequest(message.content)) {
+            if (chatPlayOptions.autoDelete) {
+                void message.delete().catch(() => null);
+                this.sendTemporaryReply(
+                    message,
+                    createEmbed("info", __("requestChannel.filteredChat")),
+                );
+            }
+            return;
+        }
+
         this.container.logger.debug(
             `[MultiBot] ${client.user?.tag} received request in channel ${message.channel.id} from ${message.author.tag}`,
         );
 
-        setTimeout(() => {
-            void (async (): Promise<void> => {
-                try {
-                    await message.delete();
-                } catch {}
-            })();
-        }, 60_000);
+        if (chatPlayOptions.autoDelete) {
+            // Opsi ChatPlay: hapus permintaan pengguna beberapa detik setelah diproses.
+            setTimeout(() => {
+                void (async (): Promise<void> => {
+                    try {
+                        await message.delete();
+                    } catch {}
+                })();
+            }, 3_500);
+        } else {
+            setTimeout(() => {
+                void (async (): Promise<void> => {
+                    try {
+                        await message.delete();
+                    } catch {}
+                })();
+            }, 60_000);
+        }
 
         const audioAttachment = message.attachments.find((a) =>
             a.contentType?.startsWith("audio/"),
@@ -436,20 +466,15 @@ export class MessageCreateListener extends Listener<typeof Events.MessageCreate>
             progressMessage = null;
         }
 
-        if (guild.queue && voiceChannel.id !== guild.queue.connection?.joinConfig.channelId) {
+        if (guild.queue && voiceChannel.id !== guild.queue.voiceChannelId) {
             this.sendTemporaryReply(
                 message,
                 createEmbed(
                     "warn",
                     __mf("commands.music.play.alreadyPlaying", {
                         voiceChannel: `**\`${
-                            guild.channels.cache.get(
-                                (
-                                    guild.queue.connection?.joinConfig as {
-                                        channelId: string;
-                                    }
-                                ).channelId,
-                            )?.name ?? "#unknown-channel"
+                            guild.channels.cache.get(guild.queue.voiceChannelId ?? "")?.name ??
+                            "#unknown-channel"
                         }\`**`,
                     }),
                 ),

@@ -176,7 +176,7 @@ export class MultiBotManager {
             botsInVoiceChannels.set(bot.client, currentVoiceChannel);
 
             const queue = botGuild.queue;
-            const queueVoiceChannel = queue?.connection?.joinConfig.channelId ?? null;
+            const queueVoiceChannel = queue?.voiceChannelId ?? null;
             const hasActiveQueue = queue !== undefined && queueVoiceChannel !== null;
             botsWithQueues.set(bot.client, queueVoiceChannel);
 
@@ -301,7 +301,7 @@ export class MultiBotManager {
         }
 
         const thisBotVoiceChannel = thisBotGuild.members.me?.voice.channelId ?? null;
-        const thisBotQueueChannel = thisBotGuild.queue?.connection?.joinConfig.channelId ?? null;
+        const thisBotQueueChannel = thisBotGuild.queue?.voiceChannelId ?? null;
 
         const voiceState = thisBotGuild.voiceStates.cache.get(client.user?.id ?? "");
         const voiceStateChannel = voiceState?.channelId ?? null;

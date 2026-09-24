@@ -1,8 +1,11 @@
 import process from "node:process";
 import { setTimeout } from "node:timers";
+import { container } from "@sapphire/framework";
+import { type ApplicationCommandDataResolvable } from "discord.js";
 import { clientOptions, discordTokens, isMultiBot, isProd } from "../../config/index.js";
 import { Rawon } from "../../structures/Rawon.js";
-import { createScopedLogger } from "./createLogger.js";
+import { buildApplicationCommandData } from "../functions/buildApplicationCommandData.js";
+import { createScopedLogger, type Logger } from "./createLogger.js";
 import { MultiBotManager } from "./MultiBotManager.js";
 
 const log = createScopedLogger("MultiBot", isProd);
@@ -10,8 +13,62 @@ const log = createScopedLogger("MultiBot", isProd);
 export class MultiBotLauncher {
     private readonly clients: Rawon[] = [];
     private readonly multiBotManager = MultiBotManager.getInstance();
+    private slashCommandData: ApplicationCommandDataResolvable[] | null = null;
 
     private static readonly SAVE_QUEUE_TIMEOUT_MS = 5000;
+
+    private async registerSlashCommands(client: Rawon, botLog: Logger): Promise<void> {
+        if (!client.config.enableSlashCommand) {
+            botLog.info("[MultiBot] Slash command registration disabled by configuration");
+            return;
+        }
+
+        try {
+            this.slashCommandData ??= buildApplicationCommandData(client);
+            const commands = this.slashCommandData;
+            if (commands.length === 0) {
+                botLog.info("[MultiBot] No application commands to register");
+                return;
+            }
+
+            if (client.config.isDev) {
+                for (const id of client.config.mainServer) {
+                    try {
+                        const guild = await client.guilds.fetch(id).catch(() => null);
+                        if (!guild) {
+                            botLog.error(`[MultiBot] Unable to fetch dev guild ${id}`);
+                            continue;
+                        }
+                        await guild.commands.set(commands);
+                        botLog.info(
+                            `[MultiBot] Registered ${commands.length} commands to dev guild ${guild.name} [${guild.id}]`,
+                        );
+                    } catch (error: unknown) {
+                        botLog.error(
+                            { err: error, guildId: id, phase: "guild-commands-set" },
+                            "[MultiBot] SLASH_CMD_REGISTER_ERR for dev guild",
+                        );
+                    }
+                }
+                return;
+            }
+
+            if (!client.application) {
+                botLog.warn(
+                    "[MultiBot] client.application unavailable, skipping slash command registration",
+                );
+                return;
+            }
+
+            await client.application.commands.set(commands);
+            botLog.info(`[MultiBot] Registered ${commands.length} application commands globally`);
+        } catch (error: unknown) {
+            botLog.error(
+                { err: error, phase: "application-commands-set" },
+                "[MultiBot] SLASH_CMD_REGISTER_ERR",
+            );
+        }
+    }
 
     private async saveAllQueueStates(): Promise<void> {
         const savePromises: Promise<void>[] = [];
@@ -97,24 +154,39 @@ export class MultiBotLauncher {
     ): Promise<Rawon> {
         const client = new Rawon(options);
         client.on("clientReady", () => {
-            log.info(
-                `[MultiBot] Bot #${tokenIndex} (${client.user?.tag}) is ready! (${client.guilds.cache.size} guilds)`,
+            const botLog = log.child({
+                bot: `#${tokenIndex} ${client.user?.tag ?? "unknown"}`,
+            });
+            botLog.info(`[MultiBot] Bot is ready! (${client.guilds.cache.size} guilds)`);
+            void this.registerSlashCommands(client, botLog);
+
+            botLog.info(
+                `[MultiBot] Diagnostics: interactionCreate listeners=${client.listenerCount("interactionCreate")}, ` +
+                    `messageCreate listeners=${client.listenerCount("messageCreate")}, ` +
+                    `voiceStateUpdate listeners=${client.listenerCount("voiceStateUpdate")}, ` +
+                    `isContainerClient=${container.client === client}`,
             );
 
             for (const guild of client.guilds.cache.values()) {
                 const member = guild.members.cache.get(client.user!.id);
-                log.debug(
-                    `[MultiBot] Bot #${tokenIndex} (${client.user?.tag}) is in guild ${guild.name} (${guild.id}), member cached: ${member !== undefined}`,
+                botLog.debug(
+                    `[MultiBot] In guild ${guild.name} (${guild.id}), member cached: ${member !== undefined}`,
                 );
             }
         });
 
         client.on("error", (error) => {
-            log.error({ err: error }, `[MultiBot] Bot #${tokenIndex} error`);
+            log.error(
+                { err: error, bot: `#${tokenIndex}`, tag: client.user?.tag ?? "not-ready" },
+                "[MultiBot] Client error",
+            );
         });
 
         client.on("warn", (warning) => {
-            log.warn(`[MultiBot] Bot #${tokenIndex} warning: ${warning}`);
+            log.warn(
+                { bot: `#${tokenIndex}`, tag: client.user?.tag ?? "not-ready" },
+                `[MultiBot] Client warning: ${warning}`,
+            );
         });
         await client.build(token);
         if (client.user) {

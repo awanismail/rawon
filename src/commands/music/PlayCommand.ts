@@ -1,7 +1,9 @@
+import { setTimeout } from "node:timers";
 import { ApplyOptions } from "@sapphire/decorators";
 import { type Command } from "@sapphire/framework";
 import { type CommandContext, ContextCommand } from "@stegripe/command-context";
 import {
+    type AutocompleteInteraction,
     type GuildMember,
     type Message,
     PermissionFlagsBits,
@@ -11,13 +13,50 @@ import {
 import i18n from "../../config/index.js";
 import { type CommandContext as LocalCommandContext } from "../../structures/CommandContext.js";
 import { type Rawon } from "../../structures/Rawon.js";
+import { type Song } from "../../typings/index.js";
 import { inVC, sameVC, useRequestChannel, validVC } from "../../utils/decorators/MusicUtil.js";
 import { createEmbed } from "../../utils/functions/createEmbed.js";
 import { formatBoldPrefixedCommand } from "../../utils/functions/formatCodeSpan.js";
 import { getEffectivePrefix } from "../../utils/functions/getEffectivePrefix.js";
 import { i18n__, i18n__mf } from "../../utils/functions/i18n.js";
+import { ResolveRateLimitError } from "../../utils/functions/resolveLimiter.js";
 import { isMemberDeafened } from "../../utils/functions/voiceStateGuards.js";
 import { checkQuery, handleVideos, searchTrack } from "../../utils/handlers/GeneralUtil.js";
+import {
+    PluginSourceUnsupportedError,
+    YouTubeNotSupportedInModeError,
+} from "../../utils/handlers/general/searchTrack.js";
+
+const TRACK_CHOICE_PREFIX = "nadatrack:";
+const TRACK_CHOICE_TTL_MS = 5 * 60_000;
+const AUTOCOMPLETE_TIMEOUT_MS = 2_500;
+
+type TrackChoiceCache = { songs: Song[]; expiresAt: number };
+const trackChoiceCache = new Map<string, TrackChoiceCache>();
+
+function rememberTrackChoices(userId: string, songs: Song[]): void {
+    trackChoiceCache.set(userId, { songs, expiresAt: Date.now() + TRACK_CHOICE_TTL_MS });
+    if (trackChoiceCache.size > 500) {
+        const now = Date.now();
+        for (const [key, cache] of trackChoiceCache) {
+            if (cache.expiresAt < now) {
+                trackChoiceCache.delete(key);
+            }
+        }
+    }
+}
+
+function takeTrackChoice(userId: string, rawQuery: string): Song | null {
+    const match = /^nadatrack:(\d+)$/u.exec(rawQuery.trim());
+    if (!match) {
+        return null;
+    }
+    const cache = trackChoiceCache.get(userId);
+    if (!cache || cache.expiresAt < Date.now()) {
+        return null;
+    }
+    return cache.songs[Number(match[1])] ?? null;
+}
 
 @ApplyOptions<Command.Options>({
     name: "play",
@@ -40,13 +79,51 @@ import { checkQuery, handleVideos, searchTrack } from "../../utils/handlers/Gene
                 opt
                     .setName("query")
                     .setDescription(i18n.__("commands.music.play.slashQueryDescription"))
-                    .setRequired(true),
+                    .setRequired(true)
+                    .setAutocomplete(true),
             ) as SlashCommandBuilder;
     },
 })
 export class PlayCommand extends ContextCommand {
     private getClient(ctx: CommandContext): Rawon {
         return ctx.client as Rawon;
+    }
+
+    public override async autocompleteRun(interaction: AutocompleteInteraction): Promise<void> {
+        const client = interaction.client as Rawon;
+        const focused = interaction.options.getFocused().trim();
+
+        if (focused.length < 2) {
+            await interaction.respond([]).catch(() => null);
+            return;
+        }
+
+        const search = searchTrack(client, focused, "youtube", {
+            guildId: interaction.guildId ?? undefined,
+            userId: interaction.user.id,
+        }).catch(() => null);
+
+        const timeout = new Promise<null>((resolve) => {
+            setTimeout(() => resolve(null), AUTOCOMPLETE_TIMEOUT_MS);
+        });
+
+        const result = await Promise.race([search, timeout]);
+        if (!result || result.items.length === 0) {
+            await interaction.respond([]).catch(() => null);
+            return;
+        }
+
+        const songs = result.items.slice(0, 25);
+        rememberTrackChoices(interaction.user.id, songs);
+
+        await interaction
+            .respond(
+                songs.map((song, index) => ({
+                    name: `${song.title}${song.author ? ` — ${song.author}` : ""}`.slice(0, 100),
+                    value: `${TRACK_CHOICE_PREFIX}${index}`,
+                })),
+            )
+            .catch(() => null);
     }
 
     private formatSearchError(error: unknown): string {
@@ -115,23 +192,21 @@ export class PlayCommand extends ContextCommand {
             });
         }
 
-        if (
-            ctx.guild?.queue &&
-            voiceChannel.id !== ctx.guild.queue.connection?.joinConfig.channelId
-        ) {
+        // Pilihan dari autocomplete: pakai lagu yang sudah di-cache — tanpa pencarian ulang.
+        const chosenTrack = takeTrackChoice(ctx.author.id, query ?? "");
+        if (chosenTrack !== null) {
+            return handleVideos(client, localCtx, [chosenTrack], voiceChannel);
+        }
+
+        if (ctx.guild?.queue && voiceChannel.id !== ctx.guild.queue.voiceChannelId) {
             return ctx.reply({
                 embeds: [
                     createEmbed(
                         "warn",
                         __mf("commands.music.play.alreadyPlaying", {
                             voiceChannel: `**\`${
-                                ctx.guild.channels.cache.get(
-                                    (
-                                        ctx.guild.queue.connection?.joinConfig as {
-                                            channelId: string;
-                                        }
-                                    ).channelId,
-                                )?.name ?? "#unknown-channel"
+                                ctx.guild.channels.cache.get(ctx.guild.queue.voiceChannelId ?? "")
+                                    ?.name ?? "#unknown-channel"
                             }\`**`,
                         }),
                     ),
@@ -155,18 +230,31 @@ export class PlayCommand extends ContextCommand {
         }
 
         const searchError: { value: unknown } = { value: null };
-        const songs = await searchTrack(client, query ?? "").catch((error: unknown) => {
+        const songs = await searchTrack(client, query ?? "", "youtube", {
+            guildId: ctx.guild?.id,
+            userId: ctx.author.id,
+        }).catch((error: unknown) => {
             searchError.value = error;
             client.logger.error("[PlayCommand] searchTrack failed:", error);
             return undefined;
         });
 
         if (!songs || songs.items.length <= 0) {
+            let errorText: string | undefined = searchError.value
+                ? this.formatSearchError(searchError.value)
+                : undefined;
+            if (searchError.value instanceof YouTubeNotSupportedInModeError) {
+                errorText = __("commands.music.play.youtubeNotSupportedMode");
+            } else if (searchError.value instanceof PluginSourceUnsupportedError) {
+                errorText = __mf("commands.music.play.pluginSourceUnavailable", {
+                    platform: searchError.value.platform,
+                });
+            } else if (searchError.value instanceof ResolveRateLimitError) {
+                errorText = __("requestChannel.rateLimited");
+            }
             const errorEmbed = createEmbed(
                 "error",
-                searchError.value
-                    ? this.formatSearchError(searchError.value)
-                    : __("commands.music.play.noSongData"),
+                errorText ?? __("commands.music.play.noSongData"),
                 true,
             );
             if (progressMessage) {

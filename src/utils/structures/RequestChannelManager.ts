@@ -1,8 +1,8 @@
-import { clearTimeout, setTimeout } from "node:timers";
-import { AudioPlayerStatus } from "@discordjs/voice";
+import { clearInterval, clearTimeout, setInterval, setTimeout } from "node:timers";
 import {
     ActionRowBuilder,
     type APIMessageTopLevelComponent,
+    type AttachmentBuilder,
     ButtonBuilder,
     ButtonStyle,
     ChannelType,
@@ -18,16 +18,19 @@ import {
     SectionBuilder,
     SeparatorBuilder,
     type StageChannel,
+    StringSelectMenuBuilder,
     type TextChannel,
     TextDisplayBuilder,
     ThumbnailBuilder,
     type VoiceChannel,
 } from "discord.js";
 import { type Rawon } from "../../structures/Rawon.js";
+import { type Song } from "../../typings/index.js";
 import { createEmbed } from "../functions/createEmbed.js";
 
 import { getMaxResThumbnail } from "../functions/getMaxResThumbnail.js";
 import { i18n__, i18n__mf } from "../functions/i18n.js";
+import { renderMusicCard } from "../functions/musicCard.js";
 import { formatDuration, normalizeTime } from "../functions/normalizeTime.js";
 import {
     type FallbackDataManager,
@@ -41,6 +44,22 @@ type PlayerStatusGridItem = {
     value: string;
 };
 
+export type ChatPlayOptions = {
+    mode: "chat" | "command";
+    smartFilter: boolean;
+    autoDelete: boolean;
+    slowmode: boolean;
+    pinPlayer: boolean;
+};
+
+const CHAT_PLAY_DEFAULT_OPTIONS: ChatPlayOptions = {
+    mode: "chat",
+    smartFilter: false,
+    autoDelete: false,
+    slowmode: false,
+    pinPlayer: false,
+};
+
 export class RequestChannelManager {
     private readonly pendingUpdates = new Map<string, NodeJS.Timeout>();
     private readonly updateGenerations = new Map<string, number>();
@@ -48,6 +67,10 @@ export class RequestChannelManager {
     private readonly updateDebounceMs = 500;
     private readonly permissionWarningCooldowns = new Map<string, number>();
     private readonly permissionWarningCooldownMs = 60_000;
+    private readonly progressRefreshIntervals = new Map<string, NodeJS.Timeout>();
+    private readonly suggestionsCache = new Map<string, Song[]>();
+    private readonly suggestionsForKeys = new Map<string, string>();
+    private readonly progressRefreshIntervalMs = 15_000;
 
     private static readonly supportedChannelTypes = new Set<ChannelType>([
         ChannelType.GuildText,
@@ -437,7 +460,132 @@ export class RequestChannelManager {
         }
     }
 
-    public createPlayerComponents(guild: Guild): APIMessageTopLevelComponent[] {
+    public getRequestChannelOptions(guild: Guild): ChatPlayOptions {
+        const botId = this.client.user?.id ?? "unknown";
+
+        if (hasGetRequestChannel(this.client.data)) {
+            const data = this.client.data.getRequestChannel(guild.id, botId);
+            return {
+                mode: data?.mode === "command" ? "command" : "chat",
+                smartFilter: data?.smartFilter === true,
+                autoDelete: data?.autoDelete === true,
+                slowmode: data?.slowmode === true,
+                pinPlayer: data?.pinPlayer === true,
+            };
+        }
+
+        // Jalur fallback JSON legacy tidak menyimpan opsi ChatPlay.
+        return { ...CHAT_PLAY_DEFAULT_OPTIONS };
+    }
+
+    public async setChatPlayOptions(
+        guild: Guild,
+        options: Partial<ChatPlayOptions>,
+    ): Promise<void> {
+        const botId = this.client.user?.id ?? "unknown";
+
+        if (hasSaveRequestChannel(this.client.data)) {
+            const current = this.client.data.getRequestChannel(guild.id, botId);
+            await this.client.data.saveRequestChannel(
+                guild.id,
+                botId,
+                current?.channelId ?? this.getRequestChannel(guild)?.id ?? null,
+                current?.messageId ?? null,
+                options,
+            );
+            if (typeof this.client.data.load === "function") {
+                await this.client.data.load();
+            }
+            return;
+        }
+
+        const fallback = this.client.data as FallbackDataManager;
+        const currentData = fallback.data ?? {};
+        const guildData = currentData[guild.id] ?? {};
+        guildData.requestChannel ??= { channelId: null, messageId: null };
+        this.client.logger.debug(
+            "[RequestChannel] ChatPlay options ignored on legacy JSON data manager",
+        );
+    }
+
+    public getSuggestions(guildId: string): Song[] {
+        return this.suggestionsCache.get(guildId) ?? [];
+    }
+
+    private async refreshSuggestions(guild: Guild): Promise<void> {
+        const queue = guild.queue;
+        const currentSong = queue?.getCurrentSong() ?? null;
+        if (!queue || !currentSong) {
+            this.suggestionsCache.delete(guild.id);
+            return;
+        }
+
+        try {
+            const suggestions = await queue.engine.resolveSuggestions(currentSong.song);
+            this.suggestionsCache.set(guild.id, suggestions);
+        } catch {
+            this.suggestionsCache.delete(guild.id);
+        }
+        this.suggestionsForKeys.set(guild.id, currentSong.key);
+        await this.updatePlayerMessage(guild);
+    }
+
+    private manageProgressRefresh(guild: Guild): void {
+        const queue = guild.queue;
+        const shouldRefresh =
+            queue?.playing === true &&
+            queue.songs.size > 0 &&
+            this.getRequestChannel(guild) !== null;
+
+        if (!shouldRefresh) {
+            this.stopProgressRefresh(guild.id);
+            return;
+        }
+
+        const currentKey = queue?.getCurrentSong()?.key;
+        if (currentKey && this.suggestionsForKeys.get(guild.id) !== currentKey) {
+            this.suggestionsForKeys.set(guild.id, currentKey);
+            void this.refreshSuggestions(guild);
+        }
+
+        if (!this.progressRefreshIntervals.has(guild.id)) {
+            const interval = setInterval(() => {
+                void this.refreshPlayerCard(guild);
+            }, this.progressRefreshIntervalMs);
+            this.progressRefreshIntervals.set(guild.id, interval);
+        }
+    }
+
+    private stopProgressRefresh(guildId: string): void {
+        const interval = this.progressRefreshIntervals.get(guildId);
+        if (interval) {
+            clearInterval(interval);
+            this.progressRefreshIntervals.delete(guildId);
+        }
+    }
+
+    private async refreshPlayerCard(guild: Guild): Promise<void> {
+        try {
+            if (guild.queue?.playing !== true) {
+                this.stopProgressRefresh(guild.id);
+                return;
+            }
+            const message = await this.getPlayerMessage(guild);
+            if (!message) {
+                return;
+            }
+            await message.edit(await this.createPlayerMessageEditOptions(guild));
+        } catch (error) {
+            this.client.logger.debug(
+                `[RequestChannel] Failed to refresh musicard: ${(error as Error).message}`,
+            );
+        }
+    }
+
+    public createPlayerComponents(
+        guild: Guild,
+        cardAttachment: AttachmentBuilder | null = null,
+    ): APIMessageTopLevelComponent[] {
         const queue = guild.queue;
 
         const botId = this.client.user?.id ?? "unknown";
@@ -471,6 +619,7 @@ export class RequestChannelManager {
 
             return this.createPlayerContainer(guild, {
                 imageUrl: splash,
+                cardImageUrl: null,
                 mainText: `### ${__("requestChannel.standby")}`,
                 queueText: this.formatQueueFooter(0, "0:00", savedAutoPlay, __, __mf),
                 requesterText: null,
@@ -510,7 +659,7 @@ export class RequestChannelManager {
             QUEUE: "🔁",
         };
 
-        const statusEmoji = queue.player.state.status === AudioPlayerStatus.Paused ? "⏸️" : "▶️";
+        const statusEmoji = queue.isPaused ? "⏸️" : "▶️";
         const loopEmoji = loopModeEmoji[queue.loopMode] ?? "▶️";
 
         const hasThumbnail = (song?.thumbnail?.length ?? 0) > 0;
@@ -561,6 +710,7 @@ export class RequestChannelManager {
 
         return this.createPlayerContainer(guild, {
             imageUrl,
+            cardImageUrl: cardAttachment === null ? null : "attachment://musicard.png",
             mainText,
             queueText,
             requesterText: song
@@ -594,6 +744,7 @@ export class RequestChannelManager {
         guild: Guild,
         options: {
             imageUrl: string;
+            cardImageUrl: string | null;
             mainText: string;
             queueText: string;
             requesterText: string | null;
@@ -634,7 +785,9 @@ export class RequestChannelManager {
                 .addTextDisplayComponents(new TextDisplayBuilder().setContent(options.mainText))
                 .addMediaGalleryComponents(
                     new MediaGalleryBuilder().addItems(
-                        new MediaGalleryItemBuilder().setURL(options.imageUrl),
+                        new MediaGalleryItemBuilder().setURL(
+                            options.cardImageUrl ?? options.imageUrl,
+                        ),
                     ),
                 );
         }
@@ -642,8 +795,14 @@ export class RequestChannelManager {
         container
             .addSeparatorComponents(new SeparatorBuilder())
             .addTextDisplayComponents(new TextDisplayBuilder().setContent(options.queueText))
-            .addSeparatorComponents(new SeparatorBuilder())
-            .addActionRowComponents(primaryControlsRow, secondaryControlsRow);
+            .addSeparatorComponents(new SeparatorBuilder());
+
+        const suggestionsRow = this.createSuggestionsRow(guild);
+        if (suggestionsRow) {
+            container.addActionRowComponents(suggestionsRow);
+        }
+
+        container.addActionRowComponents(primaryControlsRow, secondaryControlsRow);
 
         return [container.toJSON() as APIMessageTopLevelComponent];
     }
@@ -673,19 +832,66 @@ export class RequestChannelManager {
         );
     }
 
-    private createPlayerMessageCreateOptions(guild: Guild): MessageCreateOptions {
+    private async renderPlayerCard(guild: Guild): Promise<AttachmentBuilder | null> {
+        const queue = guild.queue;
+        const currentSong = queue?.getCurrentSong() ?? null;
+        if (!queue || !currentSong || queue.playing !== true) {
+            return null;
+        }
+        const song = currentSong.song;
+        if (song.isLive === true) {
+            return null;
+        }
+        return renderMusicCard({
+            title: song.title,
+            author: song.author ?? "",
+            artwork: song.thumbnail ?? null,
+            positionSeconds: queue.getCurrentPosition(),
+            durationSeconds: song.duration ?? 0,
+        });
+    }
+
+    private async createPlayerMessageCreateOptions(guild: Guild): Promise<MessageCreateOptions> {
+        const card = await this.renderPlayerCard(guild);
         return {
             flags: MessageFlags.SuppressNotifications | MessageFlags.IsComponentsV2,
-            components: this.createPlayerComponents(guild),
+            components: this.createPlayerComponents(guild, card),
+            files: card === null ? [] : [card],
         };
     }
 
-    private createPlayerMessageEditOptions(guild: Guild): MessageEditOptions {
+    private async createPlayerMessageEditOptions(guild: Guild): Promise<MessageEditOptions> {
+        const card = await this.renderPlayerCard(guild);
         return {
             embeds: [],
+            attachments: [],
             flags: MessageFlags.IsComponentsV2,
-            components: this.createPlayerComponents(guild),
+            components: this.createPlayerComponents(guild, card),
+            files: card === null ? [] : [card],
         };
+    }
+
+    private createSuggestionsRow(guild: Guild): ActionRowBuilder<StringSelectMenuBuilder> | null {
+        const suggestions = this.suggestionsCache.get(guild.id) ?? [];
+        if (suggestions.length === 0) {
+            return null;
+        }
+
+        const __ = i18n__(this.client, guild);
+        const menu = new StringSelectMenuBuilder()
+            .setCustomId("RC_SONG_SUGGESTION")
+            .setPlaceholder(`🎵 ${__("requestChannel.suggestions")}`)
+            .setMinValues(1)
+            .setMaxValues(1)
+            .addOptions(
+                ...suggestions.slice(0, 10).map((song, index) => ({
+                    label: (song.title || "Unknown").slice(0, 100),
+                    description: (song.author ?? "").slice(0, 100),
+                    value: String(index),
+                })),
+            );
+
+        return new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu);
     }
 
     private createPlayerButtonRows(
@@ -716,6 +922,10 @@ export class RequestChannelManager {
                 .setEmoji("🔊")
                 .setStyle(ButtonStyle.Secondary),
             new ButtonBuilder().setCustomId("RC_REMOVE").setEmoji("🗑️").setStyle(ButtonStyle.Danger),
+            new ButtonBuilder()
+                .setCustomId("RC_QUEUE")
+                .setEmoji("📜")
+                .setStyle(ButtonStyle.Secondary),
         );
 
         return [primaryControlsRow, secondaryControlsRow];
@@ -912,7 +1122,7 @@ export class RequestChannelManager {
                 }
 
                 try {
-                    await message.edit(this.createPlayerMessageEditOptions(guild));
+                    await message.edit(await this.createPlayerMessageEditOptions(guild));
                 } catch (error) {
                     if (this.isPermissionError(error)) {
                         const __ = i18n__(this.client, guild);
@@ -930,6 +1140,8 @@ export class RequestChannelManager {
                         `Failed to update player message: ${(error as Error).message}`,
                     );
                 }
+
+                this.manageProgressRefresh(guild);
             } catch (error) {
                 this.client.logger.debug(
                     `Error in updatePlayerMessage: ${(error as Error).message}`,
@@ -1012,13 +1224,17 @@ export class RequestChannelManager {
 
         try {
             if (message && message.author.id === this.client.user?.id) {
-                await message.edit(this.createPlayerMessageEditOptions(guild));
+                await message.edit(await this.createPlayerMessageEditOptions(guild));
             } else if (allowCreate) {
-                message = await channel.send(this.createPlayerMessageCreateOptions(guild));
+                message = await channel.send(await this.createPlayerMessageCreateOptions(guild));
                 await this.setPlayerMessageId(guild, message.id);
+                if (this.getRequestChannelOptions(guild).pinPlayer) {
+                    void message.pin().catch(() => null);
+                }
             } else {
                 return null;
             }
+            this.manageProgressRefresh(guild);
             return message;
         } catch (error) {
             if (this.isPermissionError(error)) {
@@ -1041,6 +1257,10 @@ export class RequestChannelManager {
     }
 
     public async deletePlayerMessage(guild: Guild): Promise<void> {
+        this.stopProgressRefresh(guild.id);
+        this.suggestionsCache.delete(guild.id);
+        this.suggestionsForKeys.delete(guild.id);
+
         const existingMessage = await this.getPlayerMessage(guild);
         if (existingMessage && existingMessage.author.id === this.client.user?.id) {
             await existingMessage.delete().catch(() => null);

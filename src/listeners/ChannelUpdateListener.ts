@@ -1,5 +1,4 @@
 import { setTimeout } from "node:timers";
-import { entersState, VoiceConnectionStatus } from "@discordjs/voice";
 import { ApplyOptions } from "@sapphire/decorators";
 import { Events, Listener, type ListenerOptions } from "@sapphire/framework";
 import {
@@ -29,7 +28,7 @@ export class ChannelUpdateListener extends Listener<typeof Events.ChannelUpdate>
 
         if (
             !newChannel.guild.queue ||
-            newChannel.id !== newChannel.guild.queue.connection?.joinConfig.channelId ||
+            newChannel.id !== newChannel.guild.queue.voiceChannelId ||
             (oldChannel.type !== ChannelType.GuildVoice &&
                 oldChannel.type !== ChannelType.GuildStageVoice) ||
             (newChannel.type !== ChannelType.GuildVoice &&
@@ -52,54 +51,47 @@ export class ChannelUpdateListener extends Listener<typeof Events.ChannelUpdate>
                 flags: MessageFlags.SuppressNotifications,
                 embeds: [createEmbed("info", __("events.channelUpdate.reconfigureConnection"))],
             });
-            queue.connection?.configureNetworking();
+            const recovered = await queue.engine.recoverConnection();
 
-            await entersState(
-                queue.connection as NonNullable<typeof queue.connection>,
-                VoiceConnectionStatus.Ready,
-                20_000,
-            )
-                .then(() => {
-                    void msg.edit({
-                        embeds: [
-                            createEmbed(
-                                "success",
-                                __("events.channelUpdate.connectionReconfigured"),
-                                true,
-                            ),
-                        ],
-                    });
-                    if (isRequestChannel) {
-                        setTimeout(() => {
-                            void msg.delete().catch(() => null);
-                        }, 10_000);
-                    }
-                    return 0;
-                })
-                .catch(async () => {
-                    await queue.destroy();
-                    this.container.logger.info(
-                        `${
-                            client.shard ? `[Shard #${client.shard.ids[0]}]` : ""
-                        } Unable to re-configure networking on ${
-                            newChannel.guild.name
-                        } voice channel, the queue was deleted.`,
-                    );
-                    void msg.edit({
-                        embeds: [
-                            createEmbed(
-                                "error",
-                                __("events.channelUpdate.unableReconfigureConnection"),
-                                true,
-                            ),
-                        ],
-                    });
-                    if (isRequestChannel) {
-                        setTimeout(() => {
-                            void msg.delete().catch(() => null);
-                        }, 10_000);
-                    }
+            if (recovered) {
+                void msg.edit({
+                    embeds: [
+                        createEmbed(
+                            "success",
+                            __("events.channelUpdate.connectionReconfigured"),
+                            true,
+                        ),
+                    ],
                 });
+                if (isRequestChannel) {
+                    setTimeout(() => {
+                        void msg.delete().catch(() => null);
+                    }, 10_000);
+                }
+            } else {
+                await queue.destroy();
+                this.container.logger.info(
+                    `${
+                        client.shard ? `[Shard #${client.shard.ids[0]}]` : ""
+                    } Unable to re-configure networking on ${
+                        newChannel.guild.name
+                    } voice channel, the queue was deleted.`,
+                );
+                void msg.edit({
+                    embeds: [
+                        createEmbed(
+                            "error",
+                            __("events.channelUpdate.unableReconfigureConnection"),
+                            true,
+                        ),
+                    ],
+                });
+                if (isRequestChannel) {
+                    setTimeout(() => {
+                        void msg.delete().catch(() => null);
+                    }, 10_000);
+                }
+            }
         }
     }
 }

@@ -1,5 +1,4 @@
 import { clearInterval, setInterval } from "node:timers";
-import { type AudioPlayerState, type AudioResource } from "@discordjs/voice";
 import { ApplyOptions } from "@sapphire/decorators";
 import { type Command } from "@sapphire/framework";
 import { type CommandContext, ContextCommand } from "@stegripe/command-context";
@@ -17,7 +16,6 @@ import {
 import i18n from "../../config/index.js";
 import { CommandContext as LocalCommandContext } from "../../structures/CommandContext.js";
 import { type Rawon } from "../../structures/Rawon.js";
-import { type QueueSong } from "../../typings/index.js";
 import { haveQueue } from "../../utils/decorators/MusicUtil.js";
 import { createEmbed } from "../../utils/functions/createEmbed.js";
 import { createProgressBar } from "../../utils/functions/createProgressBar.js";
@@ -59,16 +57,8 @@ export class NowPlayingCommand extends ContextCommand {
         const __mf = i18n__mf(client, ctx.guild);
         const getEmbed = (): EmbedBuilder => {
             try {
-                const res = (
-                    ctx.guild?.queue?.player.state as
-                        | (AudioPlayerState & {
-                              resource: AudioResource | undefined;
-                          })
-                        | undefined
-                )?.resource;
-                const queueSong = res?.metadata as QueueSong | undefined;
+                const queueSong = ctx.guild?.queue?.getCurrentSong() ?? undefined;
                 const song = queueSong?.song;
-                const seekOffset = ctx.guild?.queue?.seekOffset ?? 0;
 
                 const embed = createEmbed(
                     "info",
@@ -81,7 +71,7 @@ export class NowPlayingCommand extends ContextCommand {
                 }
                 embed.setThumbnail(thumb);
 
-                const curr = Math.trunc((res?.playbackDuration ?? 0) / 1_000) + seekOffset;
+                const curr = ctx.guild?.queue?.getCurrentPosition() ?? 0;
                 let progressLine: string;
                 if (song?.isLive === true) {
                     progressLine = `🔴 **\`${__("commands.music.nowplaying.live")}\`**`;
@@ -162,14 +152,7 @@ export class NowPlayingCommand extends ContextCommand {
 
         const updateInterval = setInterval(async () => {
             try {
-                const res = (
-                    ctx.guild?.queue?.player.state as
-                        | (AudioPlayerState & {
-                              resource: AudioResource | undefined;
-                          })
-                        | undefined
-                )?.resource;
-                const queueSong = res?.metadata as QueueSong | undefined;
+                const queueSong = ctx.guild?.queue?.getCurrentSong();
                 if (!queueSong) {
                     return;
                 }

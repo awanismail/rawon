@@ -1,5 +1,4 @@
 import { setInterval, setTimeout } from "node:timers";
-import { joinVoiceChannel } from "@discordjs/voice";
 import { ApplyOptions } from "@sapphire/decorators";
 import { Events, Listener, type ListenerOptions } from "@sapphire/framework";
 import { ActivityType, ChannelType, type Presence, type TextChannel } from "discord.js";
@@ -11,7 +10,6 @@ import {
     type ExtendedDataManager,
     type GuildData,
 } from "../typings/index.js";
-import { createVoiceAdapter } from "../utils/functions/createVoiceAdapter.js";
 import { type filterArgs } from "../utils/functions/ffmpegArgs.js";
 import { formatMS } from "../utils/functions/formatMS.js";
 import { play } from "../utils/handlers/GeneralUtil.js";
@@ -54,6 +52,11 @@ export class ReadyListener extends Listener<typeof Events.ClientReady> {
     public async run(readyClient: typeof this.container.client): Promise<void> {
         const client = readyClient as Rawon;
         this.currentClient = client;
+
+        if (client.riffy) {
+            client.riffy.init(client.user?.id ?? "");
+            this.container.logger.info("[Lavalink] Riffy initialized");
+        }
 
         if (client.application?.owner) {
             this.container.config.devs.push(client.application.owner.id);
@@ -506,19 +509,7 @@ export class ReadyListener extends Listener<typeof Events.ClientReady> {
                         return;
                     }
 
-                    const adapterCreator = createVoiceAdapter(client, guild.id);
-
-                    const connection = joinVoiceChannel({
-                        adapterCreator,
-                        channelId: voiceChannel.id,
-                        guildId: guild.id,
-                        selfDeaf: true,
-                        group: client.user?.id ?? "default",
-                    }).on("debug", (message) => {
-                        this.container.logger.debug(message);
-                    });
-
-                    guild.queue.connection = connection;
+                    guild.queue.engine.connect(guild, voiceChannel.id, guild.queue.textChannel.id);
 
                     const currentSongKey = queueState.currentSongKey;
                     const currentPosition = queueState.currentPosition ?? 0;

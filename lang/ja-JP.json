@@ -241,7 +241,8 @@
                 "slashStateFilterDescription": "フィルターは{state, select, enable {有効化} other {無効化}}になります。",
                 "slashStatusDescription": "現在のフィルターの状態を確認",
                 "slashStatusFilterDescription": "確認したいフィルター",
-                "specifyFilter": "フィルターを指定してください。"
+                "specifyFilter": "フィルターを指定してください。",
+                "notAvailableInMode": "⚠️ **|** Filter {filter} is not available in musicify mode."
             },
             "lyrics": {
                 "description": "曲の歌詞を表示",
@@ -274,7 +275,9 @@
                 "description": "音楽を再生",
                 "noSongData": "そのURLは曲データを含んでいません。",
                 "slashQueryDescription": "検索キーワード",
-                "usage": "{prefix}play <キーワード | URL>"
+                "usage": "{prefix}play <キーワード | URL>",
+                "youtubeNotSupportedMode": "❌ **|** youtube.com links are not supported in musicify mode. Use YouTube Music (music.youtube.com) links instead.",
+                "pluginSourceUnavailable": "❌ **|** {platform} links can only be played in musicify mode (Lavalink). Switch the engine mode or use another source."
             },
             "queue": {
                 "description": "キューリストを表示"
@@ -390,6 +393,19 @@
                 "slashStatusDescription": "現在のリクエストチャンネルを表示",
                 "slashChannelDescription": "リクエストチャンネルとして設定するチャンネル",
                 "usage": "{prefix}requestchannel <set | remove | status> [channel]"
+            },
+            "chatplay": {
+                "description": "Set up or manage ChatPlay (song request channel) for this server",
+                "usage": "{prefix}chatplay set <channel> [chat|command] [smartfilter on/off] [autodelete on/off] [slowmode on/off] [pin on/off] | remove | status",
+                "slashSetDescription": "Set the ChatPlay channel for this server",
+                "slashChannelDescription": "The channel to use for ChatPlay",
+                "slashModeDescription": "How requests are accepted: chat messages or commands only",
+                "slashSmartFilterDescription": "Reject chat-only messages with the smart filter",
+                "slashAutoDeleteDescription": "Delete user song requests shortly after processing",
+                "slashSlowmodeDescription": "Enable slowmode on the ChatPlay channel",
+                "slashPinDescription": "Pin the player message in the channel",
+                "slashRemoveDescription": "Remove the ChatPlay channel",
+                "slashStatusDescription": "Show the current ChatPlay configuration"
             }
         }
     },
@@ -464,7 +480,17 @@
         "skippedReasonUnavailable": "非公開/削除済み、または利用不可",
         "skippedReasonUnresolved": "再生可能な曲に一致できませんでした",
         "skippedReasonSkipped": "重複、非公開/削除済み、または利用不可",
-        "resolvingSong": "曲を解決しています。しばらくお待ちください…"
+        "resolvingSong": "曲を解決しています。しばらくお待ちください…",
+        "filteredChat": "💬 **|** That message looks like chat, not a song request — send a song title or link, or use a command.",
+        "suggestions": "Suggested songs",
+        "modeLabel": "Request mode",
+        "modeChat": "Chat",
+        "modeCommand": "Command only",
+        "smartFilter": "Smart filter",
+        "autoDelete": "Auto-delete requests",
+        "slowmode": "Slowmode",
+        "pinPlayer": "Pin player",
+        "rateLimited": "⏳ **|** You are requesting songs too quickly. Please wait a moment and try again."
     },
     "reusable": {
         "invalidUsage": "無効な使用方法です。{prefix} {name}を実行して情報を照会してください。",

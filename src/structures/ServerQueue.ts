@@ -1,13 +1,5 @@
 import { clearInterval, clearTimeout, setInterval, setTimeout } from "node:timers";
 import {
-    type AudioPlayer,
-    type AudioPlayerPlayingState,
-    AudioPlayerStatus,
-    type AudioResource,
-    createAudioPlayer,
-    type VoiceConnection,
-} from "@discordjs/voice";
-import {
     ChannelType,
     Events,
     MessageFlags,
@@ -17,6 +9,12 @@ import {
     type VoiceChannel,
 } from "discord.js";
 import { type LoopMode, type QueueSong, type SavedQueueSong, type Song } from "../typings/index.js";
+import { createEngine } from "../utils/engines/EngineResolver.js";
+import {
+    type EngineTrackEndPayload,
+    type EngineTrackStartPayload,
+    type PlaybackEngine,
+} from "../utils/engines/types.js";
 import { createEmbed } from "../utils/functions/createEmbed.js";
 import { type filterArgs } from "../utils/functions/ffmpegArgs.js";
 import { formatBoldPrefixedCommand } from "../utils/functions/formatCodeSpan.js";
@@ -24,7 +22,6 @@ import { formatBoldMarkdownLink } from "../utils/functions/formatMarkdown.js";
 import { getEffectivePrefix } from "../utils/functions/getEffectivePrefix.js";
 import { i18n__mf } from "../utils/functions/i18n.js";
 import { play } from "../utils/handlers/GeneralUtil.js";
-import { resolveAutoplayCandidate } from "../utils/handlers/general/autoplaySong.js";
 import { SongManager } from "../utils/structures/SongManager.js";
 import { BOT_SETTINGS_DEFAULTS } from "../utils/structures/SQLiteDataManager.js";
 import {
@@ -82,8 +79,7 @@ const AUTOPLAY_RECENT_REPEAT_MAX_WINDOW = 14;
 const AUTOPLAY_RESOLVE_ATTEMPTS = 5;
 
 export class ServerQueue {
-    public readonly player: AudioPlayer = createAudioPlayer();
-    public connection: VoiceConnection | null = null;
+    public readonly engine: PlaybackEngine;
     public queueEndedNotified = false;
     public timeout: NodeJS.Timeout | null = null;
     public readonly songs: SongManager;
@@ -138,282 +134,278 @@ export class ServerQueue {
             _pendingDisplaySongKey: nonEnum,
         });
 
+        this.engine = createEngine(this.client, this.textChannel.guild);
+
         this.songs = new SongManager(this.client, this.textChannel.guild);
 
         this.loadSavedState();
 
-        this.player
-            .on("stateChange", async (oldState, newState) => {
-                const __mf = i18n__mf(this.client, this.textChannel.guild);
-                if (
-                    newState.status === AudioPlayerStatus.Playing &&
-                    oldState.status !== AudioPlayerStatus.Paused
-                ) {
-                    this.clearRequesterDeafTimeout();
-                    this.endSkip();
-                    this._pendingDisplaySongKey = null;
-                    newState.resource.volume?.setVolumeLogarithmic(this.volume / 100);
+        this.engine.setVolume(this._volume);
 
-                    const currentSong = (this.player.state as AudioPlayerPlayingState).resource
-                        .metadata as QueueSong;
-                    const newSong = currentSong.song;
-
-                    void this.setNowPlayingVoiceChannelStatus(newSong.title);
-
-                    const isRequestChannel = this.client.requestChannelManager.isRequestChannel(
-                        this.textChannel.guild,
-                        this.textChannel.id,
-                    );
-                    if (isRequestChannel) {
-                        this.client.logger.info(
-                            `${this.client.shard ? `[Shard #${this.client.shard.ids[0]}]` : ""} Track: "${newSong.title}" on ${this.textChannel.guild.name} has started.`,
-                        );
-                    } else {
-                        this.sendStartPlayingMsg(newSong);
-                    }
-
-                    void this.client.requestChannelManager.updatePlayerMessage(
-                        this.textChannel.guild,
-                        true,
-                    );
-
-                    void this.saveQueueState();
-
-                    this.startPositionSaveInterval();
-
-                    this.preCacheNextSong(currentSong);
-                } else if (newState.status === AudioPlayerStatus.Idle) {
-                    this.stopPositionSaveInterval();
-
-                    const song = (oldState as AudioPlayerPlayingState).resource
-                        .metadata as QueueSong;
-                    this.client.logger.info(
-                        `${this.client.shard ? `[Shard #${this.client.shard.ids[0]}]` : ""} Track: "${
-                            song.song.title
-                        }" on ${this.textChannel.guild.name} has ended.`,
-                    );
-                    try {
-                        const playingResource = (this.player.state as AudioPlayerPlayingState | any)
-                            .resource as AudioResource | undefined;
-                        const playbackMs = playingResource?.playbackDuration ?? null;
-                        this.client.logger.debug(
-                            "[ServerQueue] IdleHandler - previous resource playbackDurationMs",
-                            {
-                                guild: this.textChannel.guild.id,
-                                playbackDurationMs: playbackMs,
-                            },
-                        );
-                    } catch {}
-                    try {
-                        const upcoming = this.songs.sortByIndex().map((s) => s.key);
-                        this.client.logger.debug("[ServerQueue] IdleHandler - queueState", {
-                            guild: this.textChannel.guild.id,
-                            songsSize: this.songs.size,
-                            loopMode: this.loopMode,
-                            shuffle: this.shuffle,
-                            autoPlay: this.autoPlay,
-                            upcomingKeys: upcoming as string[],
-                        });
-                    } catch {
-                        this.client.logger.debug(
-                            "[ServerQueue] IdleHandler - queueState (failed to serialize)",
-                        );
-                    }
-                    this.skipVoters = [];
-                    if (this.loopMode === "OFF") {
-                        this.songs.delete(song.key);
-                    }
-
-                    let nextS: string | undefined;
-                    if (this.shuffle && this.loopMode !== "SONG") {
-                        nextS = this.getNextShuffleKey(song.key);
-                    } else if (this.loopMode === "SONG") {
-                        if (this.songs.has(song.key)) {
-                            nextS = song.key;
-                        } else {
-                            const sortedSongs = this.songs.sortByIndex();
-                            nextS =
-                                sortedSongs.filter((x) => x.index > song.index).first()?.key ??
-                                sortedSongs.first()?.key;
-                        }
-                    } else {
-                        const sortedSongs = this.songs.sortByIndex();
-                        nextS =
-                            sortedSongs.filter((x) => x.index > song.index).first()?.key ??
-                            (this.loopMode === "QUEUE" ? (sortedSongs.first()?.key ?? "") : "");
-                    }
-
-                    const me = this.textChannel.guild.members.me;
-                    if (!nextS && this.autoPlay && me) {
-                        const autoPlaySong =
-                            (await this.consumePrefetchedAutoplaySong(song)) ??
-                            (await this.resolveAutoplaySong(song));
-
-                        if (autoPlaySong !== undefined) {
-                            nextS = this.songs.addSong(autoPlaySong, me);
-                            this.recordAutoplayHistory(autoPlaySong);
-                            this.client.logger.info(
-                                `[ServerQueue] Auto-play queued for ${this.textChannel.guild.name}: ${autoPlaySong.title}`,
-                            );
-                        }
-                    }
-
-                    if (this._prefetchedAutoplaySong?.fromSongKey === song.key) {
-                        this._prefetchedAutoplaySong = null;
-                    }
-
-                    this._pendingDisplaySongKey = nextS && this.songs.has(nextS) ? nextS : null;
-
-                    void this.client.requestChannelManager.updatePlayerMessage(
-                        this.textChannel.guild,
-                    );
-
-                    this.client.logger.debug("[ServerQueue] IdleHandler - nextCandidate", {
-                        guild: this.textChannel.guild.id,
-                        nextKey: nextS ?? null,
-                        songsSize: this.songs.size,
-                    });
-
-                    const isRequestChannel = this.client.requestChannelManager.isRequestChannel(
-                        this.textChannel.guild,
-                        this.textChannel.id,
-                    );
-                    if (!isRequestChannel) {
-                        if (this._playerWidgetMsgId) {
-                            await this.deletePlayerWidget();
-                        }
-                        await this.textChannel
-                            .send({
-                                flags: MessageFlags.SuppressNotifications,
-                                embeds: [
-                                    createEmbed(
-                                        "info",
-                                        `⏹️ **|** ${__mf("utils.generalHandler.stopPlaying", {
-                                            song: formatBoldMarkdownLink(
-                                                song.song.title,
-                                                song.song.url,
-                                            ),
-                                        })}`,
-                                    ).setThumbnail(
-                                        typeof song.song.thumbnail === "string" &&
-                                            /^https?:\/\//u.test(song.song.thumbnail)
-                                            ? song.song.thumbnail
-                                            : null,
-                                    ),
-                                ],
-                            })
-                            .then((ms) => (this.lastMusicMsg = ms.id))
-                            .catch((error: unknown) =>
-                                this.client.logger.error("PLAY_ERR:", error),
-                            );
-                    }
-
-                    try {
-                        await play(this.textChannel.guild, nextS);
-                    } catch (error) {
-                        this.client.logger.debug("[ServerQueue] IdleHandler - play() threw", {
-                            guild: this.textChannel.guild.id,
-                            nextKey: nextS ?? null,
-                            error:
-                                error instanceof Error
-                                    ? (error.stack ?? error.message)
-                                    : String(error),
-                        });
-                        if (!isRequestChannel) {
-                            try {
-                                await this.textChannel.send({
-                                    flags: MessageFlags.SuppressNotifications,
-                                    embeds: [
-                                        createEmbed(
-                                            "error",
-                                            __mf("utils.generalHandler.errorPlaying", {
-                                                message: `\`${error as string}\``,
-                                            }),
-                                            true,
-                                        ),
-                                    ],
-                                });
-                            } catch (playError) {
-                                this.client.logger.error("PLAY_ERR:", playError);
-                            }
-                        }
-
-                        this.client.logger.error("PLAY_ERR:", error);
-
-                        const fallback = this.getNextSongKeyAfter(song);
-                        if (fallback && fallback !== nextS) {
-                            try {
-                                this.client.logger.info(
-                                    `[ServerQueue] Attempting fallback play for ${this.textChannel.guild.name}: ${fallback}`,
-                                );
-                                await play(this.textChannel.guild, fallback);
-                                return;
-                            } catch (retryErr) {
-                                this.client.logger.error("PLAY_ERR_RETRY:", retryErr);
-                            }
-                        }
-
-                        try {
-                            await play(this.textChannel.guild);
-                        } catch (finalErr) {
-                            this.client.logger.error("PLAY_ERR_FINAL:", finalErr);
-                            this.connection?.disconnect();
-                        }
-                    }
-                }
+        this.engine
+            .on("trackStart", (payload) => {
+                this.handleEngineTrackStart(payload);
             })
-            .on("error", (err) => {
-                if (this._suppressPlayerErrors) {
-                    this.client.logger.debug(
-                        "[ServerQueue] Suppressed player error during shutdown:",
-                        err instanceof Error ? (err.stack ?? err.message) : err,
-                    );
-                    return;
-                }
-
-                const __mf = i18n__mf(this.client, this.textChannel.guild);
-                if (err && (err as Error).name === "AbortError") {
-                    this.client.logger.debug("Playback aborted:", (err as Error).message);
-                    return;
-                }
-
-                (async () => {
-                    const isRequestChannel = this.client.requestChannelManager.isRequestChannel(
-                        this.textChannel.guild,
-                        this.textChannel.id,
-                    );
-
-                    const messageText = __mf("utils.generalHandler.errorPlaying", {
-                        message: `\`${(err as Error)?.message ?? String(err)}\``,
-                    });
-
-                    const errorMsg = await this.textChannel
-                        .send({
-                            flags: MessageFlags.SuppressNotifications,
-                            embeds: [createEmbed("error", messageText, true)],
-                        })
-                        .catch((error: unknown) => {
-                            this.client.logger.error(
-                                "PLAY_CMD_ERR:",
-                                error instanceof Error ? (error.stack ?? error) : error,
-                            );
-                            return null;
-                        });
-
-                    if (isRequestChannel && errorMsg) {
-                        setTimeout(() => {
-                            errorMsg.delete().catch(() => null);
-                        }, 60_000);
-                    }
-                })();
-                this.client.logger.error(
-                    "PLAY_ERR:",
-                    err instanceof Error ? (err.stack ?? err) : err,
-                );
+            .on("trackEnd", (payload) => {
+                void this.handleEngineTrackEnd(payload);
+            })
+            .on("playbackError", (err) => {
+                this.handleEnginePlaybackError(err);
             })
             .on("debug", (message) => {
                 this.client.logger.debug(message);
             });
+    }
+
+    private handleEngineTrackStart({ track }: EngineTrackStartPayload): void {
+        this.clearRequesterDeafTimeout();
+        this.endSkip();
+        this._pendingDisplaySongKey = null;
+
+        const currentSong = track;
+        const newSong = currentSong.song;
+
+        void this.setNowPlayingVoiceChannelStatus(newSong.title);
+
+        const isRequestChannel = this.client.requestChannelManager.isRequestChannel(
+            this.textChannel.guild,
+            this.textChannel.id,
+        );
+        if (isRequestChannel) {
+            this.client.logger.info(
+                `${this.client.shard ? `[Shard #${this.client.shard.ids[0]}]` : ""} Track: "${newSong.title}" on ${this.textChannel.guild.name} has started.`,
+            );
+        } else {
+            this.sendStartPlayingMsg(newSong);
+        }
+
+        void this.client.requestChannelManager.updatePlayerMessage(this.textChannel.guild, true);
+
+        void this.saveQueueState();
+
+        this.startPositionSaveInterval();
+
+        this.preCacheNextSong(currentSong);
+    }
+
+    private async handleEngineTrackEnd({
+        track,
+        playbackDurationMs,
+    }: EngineTrackEndPayload): Promise<void> {
+        const __mf = i18n__mf(this.client, this.textChannel.guild);
+        this.stopPositionSaveInterval();
+
+        const song = track;
+        this.client.logger.info(
+            `${this.client.shard ? `[Shard #${this.client.shard.ids[0]}]` : ""} Track: "${
+                song.song.title
+            }" on ${this.textChannel.guild.name} has ended.`,
+        );
+        try {
+            this.client.logger.debug(
+                "[ServerQueue] IdleHandler - previous resource playbackDurationMs",
+                {
+                    guild: this.textChannel.guild.id,
+                    playbackDurationMs: playbackDurationMs,
+                },
+            );
+        } catch {}
+        try {
+            const upcoming = this.songs.sortByIndex().map((s) => s.key);
+            this.client.logger.debug("[ServerQueue] IdleHandler - queueState", {
+                guild: this.textChannel.guild.id,
+                songsSize: this.songs.size,
+                loopMode: this.loopMode,
+                shuffle: this.shuffle,
+                autoPlay: this.autoPlay,
+                upcomingKeys: upcoming as string[],
+            });
+        } catch {
+            this.client.logger.debug(
+                "[ServerQueue] IdleHandler - queueState (failed to serialize)",
+            );
+        }
+        this.skipVoters = [];
+        if (this.loopMode === "OFF") {
+            this.songs.delete(song.key);
+        }
+
+        let nextS: string | undefined;
+        if (this.shuffle && this.loopMode !== "SONG") {
+            nextS = this.getNextShuffleKey(song.key);
+        } else if (this.loopMode === "SONG") {
+            if (this.songs.has(song.key)) {
+                nextS = song.key;
+            } else {
+                const sortedSongs = this.songs.sortByIndex();
+                nextS =
+                    sortedSongs.filter((x) => x.index > song.index).first()?.key ??
+                    sortedSongs.first()?.key;
+            }
+        } else {
+            const sortedSongs = this.songs.sortByIndex();
+            nextS =
+                sortedSongs.filter((x) => x.index > song.index).first()?.key ??
+                (this.loopMode === "QUEUE" ? (sortedSongs.first()?.key ?? "") : "");
+        }
+
+        const me = this.textChannel.guild.members.me;
+        if (!nextS && this.autoPlay && me) {
+            const autoPlaySong =
+                (await this.consumePrefetchedAutoplaySong(song)) ??
+                (await this.resolveAutoplaySong(song));
+
+            if (autoPlaySong !== undefined) {
+                nextS = this.songs.addSong(autoPlaySong, me);
+                this.recordAutoplayHistory(autoPlaySong);
+                this.client.logger.info(
+                    `[ServerQueue] Auto-play queued for ${this.textChannel.guild.name}: ${autoPlaySong.title}`,
+                );
+            }
+        }
+
+        if (this._prefetchedAutoplaySong?.fromSongKey === song.key) {
+            this._prefetchedAutoplaySong = null;
+        }
+
+        this._pendingDisplaySongKey = nextS && this.songs.has(nextS) ? nextS : null;
+
+        void this.client.requestChannelManager.updatePlayerMessage(this.textChannel.guild);
+
+        this.client.logger.debug("[ServerQueue] IdleHandler - nextCandidate", {
+            guild: this.textChannel.guild.id,
+            nextKey: nextS ?? null,
+            songsSize: this.songs.size,
+        });
+
+        const isRequestChannel = this.client.requestChannelManager.isRequestChannel(
+            this.textChannel.guild,
+            this.textChannel.id,
+        );
+        if (!isRequestChannel) {
+            if (this._playerWidgetMsgId) {
+                await this.deletePlayerWidget();
+            }
+            await this.textChannel
+                .send({
+                    flags: MessageFlags.SuppressNotifications,
+                    embeds: [
+                        createEmbed(
+                            "info",
+                            `⏹️ **|** ${__mf("utils.generalHandler.stopPlaying", {
+                                song: formatBoldMarkdownLink(song.song.title, song.song.url),
+                            })}`,
+                        ).setThumbnail(
+                            typeof song.song.thumbnail === "string" &&
+                                /^https?:\/\//u.test(song.song.thumbnail)
+                                ? song.song.thumbnail
+                                : null,
+                        ),
+                    ],
+                })
+                .then((ms) => (this.lastMusicMsg = ms.id))
+                .catch((error: unknown) => this.client.logger.error("PLAY_ERR:", error));
+        }
+
+        try {
+            await play(this.textChannel.guild, nextS);
+        } catch (error) {
+            this.client.logger.debug("[ServerQueue] IdleHandler - play() threw", {
+                guild: this.textChannel.guild.id,
+                nextKey: nextS ?? null,
+                error: error instanceof Error ? (error.stack ?? error.message) : String(error),
+            });
+            if (!isRequestChannel) {
+                try {
+                    await this.textChannel.send({
+                        flags: MessageFlags.SuppressNotifications,
+                        embeds: [
+                            createEmbed(
+                                "error",
+                                __mf("utils.generalHandler.errorPlaying", {
+                                    message: `\`${error as string}\``,
+                                }),
+                                true,
+                            ),
+                        ],
+                    });
+                } catch (playError) {
+                    this.client.logger.error("PLAY_ERR:", playError);
+                }
+            }
+
+            this.client.logger.error("PLAY_ERR:", error);
+
+            const fallback = this.getNextSongKeyAfter(song);
+            if (fallback && fallback !== nextS) {
+                try {
+                    this.client.logger.info(
+                        `[ServerQueue] Attempting fallback play for ${this.textChannel.guild.name}: ${fallback}`,
+                    );
+                    await play(this.textChannel.guild, fallback);
+                    return;
+                } catch (retryErr) {
+                    this.client.logger.error("PLAY_ERR_RETRY:", retryErr);
+                }
+            }
+
+            try {
+                await play(this.textChannel.guild);
+            } catch (finalErr) {
+                this.client.logger.error("PLAY_ERR_FINAL:", finalErr);
+                this.engine.disconnectVoice();
+            }
+        }
+    }
+
+    private handleEnginePlaybackError(err: Error): void {
+        if (this._suppressPlayerErrors) {
+            this.client.logger.debug(
+                "[ServerQueue] Suppressed player error during shutdown:",
+                err instanceof Error ? (err.stack ?? err.message) : err,
+            );
+            return;
+        }
+
+        const __mf = i18n__mf(this.client, this.textChannel.guild);
+        if (err && (err as Error).name === "AbortError") {
+            this.client.logger.debug("Playback aborted:", (err as Error).message);
+            return;
+        }
+
+        (async () => {
+            const isRequestChannel = this.client.requestChannelManager.isRequestChannel(
+                this.textChannel.guild,
+                this.textChannel.id,
+            );
+
+            const messageText = __mf("utils.generalHandler.errorPlaying", {
+                message: `\`${(err as Error)?.message ?? String(err)}\``,
+            });
+
+            const errorMsg = await this.textChannel
+                .send({
+                    flags: MessageFlags.SuppressNotifications,
+                    embeds: [createEmbed("error", messageText, true)],
+                })
+                .catch((error: unknown) => {
+                    this.client.logger.error(
+                        "PLAY_CMD_ERR:",
+                        error instanceof Error ? (error.stack ?? error.message) : error,
+                    );
+                    return null;
+                });
+
+            if (isRequestChannel && errorMsg) {
+                setTimeout(() => {
+                    errorMsg.delete().catch(() => null);
+                }, 60_000);
+            }
+        })();
+        this.client.logger.error(
+            "PLAY_ERR:",
+            err instanceof Error ? (err.stack ?? err.message) : err,
+        );
     }
 
     private loadSavedState(): void {
@@ -559,13 +551,11 @@ export class ServerQueue {
     public async saveQueueState(): Promise<void> {
         let currentSongKey: string | null = null;
         let currentPosition = 0;
-        if (this.player.state.status === AudioPlayerStatus.Playing) {
-            const resource = (this.player.state as AudioPlayerPlayingState).resource;
-            const metadata = resource.metadata as QueueSong | undefined;
-            if (metadata !== undefined) {
-                currentSongKey = metadata.key;
-                currentPosition =
-                    Math.floor((resource.playbackDuration ?? 0) / 1000) + this.seekOffset;
+        if (this.engine.getStatus() === "playing") {
+            const track = this.engine.getCurrentTrack();
+            if (track !== null) {
+                currentSongKey = track.key;
+                currentPosition = this.getCurrentPosition();
             }
         }
 
@@ -585,7 +575,7 @@ export class ServerQueue {
             currentPosition = 0;
         }
 
-        const voiceChannelId = this.connection?.joinConfig.channelId;
+        const voiceChannelId = this.engine.voiceChannelId;
         if (
             voiceChannelId === undefined ||
             voiceChannelId === null ||
@@ -666,9 +656,15 @@ export class ServerQueue {
 
         void this.saveState();
 
-        if (before !== state && this.player.state.status === AudioPlayerStatus.Playing) {
-            const resource = (this.player.state as AudioPlayerPlayingState).resource;
-            const currentSong = (resource as AudioResource<QueueSong>).metadata;
+        if (before !== state && this.engine.getStatus() === "playing") {
+            if (this.engine.applyFiltersLive(this.filters)) {
+                return true;
+            }
+
+            const currentSong = this.engine.getCurrentTrack();
+            if (!currentSong) {
+                return true;
+            }
             const songUrl = getPlayableSongUrl(currentSong.song);
             const isLive = currentSong.song.isLive ?? false;
 
@@ -683,8 +679,7 @@ export class ServerQueue {
             const isInProgress = this.client.audioCache.isInProgress(songUrl);
 
             if (isCached && !isInProgress) {
-                const currentPosition =
-                    Math.floor((resource.playbackDuration ?? 0) / 1000) + this.seekOffset;
+                const currentPosition = this.getCurrentPosition();
 
                 this.seekOffset = currentPosition;
                 this.playing = false;
@@ -725,10 +720,11 @@ export class ServerQueue {
         this.autoPlay = value;
         if (!value) {
             this.clearAutoplayPrefetchState();
-        } else if (this.player.state.status === AudioPlayerStatus.Playing) {
-            const currentSong = (this.player.state as AudioPlayerPlayingState).resource
-                .metadata as QueueSong;
-            this.preCacheNextSong(currentSong);
+        } else if (this.engine.getStatus() === "playing") {
+            const currentSong = this.engine.getCurrentTrack();
+            if (currentSong) {
+                this.preCacheNextSong(currentSong);
+            }
         }
         void this.saveState();
         this.refreshPlayerUi();
@@ -760,11 +756,8 @@ export class ServerQueue {
         try {
             const songUrls: string[] = this.songs.map((s) => s.song.url);
             try {
-                const playingResource = (this.player.state as AudioPlayerPlayingState | any)
-                    .resource as import("@discordjs/voice").AudioResource | undefined;
-                const metadata = playingResource?.metadata as QueueSong | undefined;
-                const meta = metadata as { song?: { url?: string }; url?: string } | undefined;
-                const currentUrl = meta?.song?.url ?? meta?.url ?? null;
+                const currentSong = this.engine.getCurrentTrack();
+                const currentUrl = currentSong?.song.url ?? null;
                 if (currentUrl && !songUrls.includes(currentUrl)) {
                     songUrls.push(currentUrl);
                 }
@@ -779,7 +772,7 @@ export class ServerQueue {
         setTimeout(() => {
             this._suppressPlayerErrors = false;
         }, 2_000);
-        this.player.stop(true);
+        this.engine.stopCurrent();
     }
 
     public async destroy(): Promise<void> {
@@ -794,9 +787,8 @@ export class ServerQueue {
         this.stop();
         await this.restoreVoiceChannelStatus();
 
-        try {
-            this.connection?.disconnect();
-        } catch {}
+        this.engine.disconnectVoice();
+        this.engine.destroy();
 
         const start = Date.now();
         const timeoutMs = 5_000;
@@ -896,10 +888,7 @@ export class ServerQueue {
 
     public set volume(newVol: number) {
         this._volume = newVol;
-        const resource = (
-            this.player.state as AudioPlayerPlayingState & { resource: AudioResource | undefined }
-        ).resource;
-        resource?.volume?.setVolumeLogarithmic(this._volume / 100);
+        this.engine.setVolume(newVol);
         void this.saveState();
         this.refreshPlayerUi();
     }
@@ -986,7 +975,7 @@ export class ServerQueue {
     }
 
     public get playing(): boolean {
-        return this.player.state.status === AudioPlayerStatus.Playing;
+        return this.engine.getStatus() === "playing";
     }
 
     public set playing(value: boolean) {
@@ -994,15 +983,15 @@ export class ServerQueue {
             if (this.requesterDeafTimeout) {
                 return;
             }
-            this.player.unpause();
+            this.engine.resume();
         } else {
-            this.player.pause();
+            this.engine.pause();
         }
         this.refreshPlayerUi(true);
     }
 
     public get idle(): boolean {
-        return this.player.state.status === AudioPlayerStatus.Idle && this.songs.size === 0;
+        return this.engine.getStatus() === "idle" && this.songs.size === 0;
     }
 
     public get client(): Rawon {
@@ -1052,13 +1041,9 @@ export class ServerQueue {
     }
 
     public getCurrentSong(): QueueSong | null {
-        const playerState = this.player.state;
-        if (
-            playerState.status === AudioPlayerStatus.Playing ||
-            playerState.status === AudioPlayerStatus.Paused ||
-            playerState.status === AudioPlayerStatus.Buffering
-        ) {
-            return playerState.resource.metadata as QueueSong;
+        const track = this.engine.getCurrentTrack();
+        if (track !== null) {
+            return track;
         }
 
         if (this._pendingDisplaySongKey) {
@@ -1066,6 +1051,22 @@ export class ServerQueue {
         }
 
         return null;
+    }
+
+    public getCurrentPosition(): number {
+        return this.engine.getElapsedSeconds() + this.seekOffset;
+    }
+
+    public stopCurrent(): void {
+        this.engine.stopCurrent();
+    }
+
+    public get isPaused(): boolean {
+        return this.engine.getStatus() === "paused";
+    }
+
+    public get voiceChannelId(): Snowflake | undefined {
+        return this.engine.voiceChannelId;
     }
 
     public async deletePlayerWidget(): Promise<void> {
@@ -1084,7 +1085,7 @@ export class ServerQueue {
     }
 
     private getConnectedVoiceChannel(): VoiceChannel | null {
-        const voiceChannelId = this.connection?.joinConfig.channelId;
+        const voiceChannelId = this.engine.voiceChannelId;
         if (!voiceChannelId) {
             return null;
         }
@@ -1395,7 +1396,7 @@ export class ServerQueue {
             }
         }
 
-        if (songsToCache.length > 0) {
+        if (songsToCache.length > 0 && this.engine.mode === "rawon") {
             void this.client.audioCache.preCacheMultiple(songsToCache);
         }
 
@@ -1517,7 +1518,7 @@ export class ServerQueue {
                 song: autoPlaySong,
             };
 
-            if (!autoPlaySong.isLive) {
+            if (!autoPlaySong.isLive && this.engine.mode === "rawon") {
                 await this.client.audioCache.preCacheUrl(getPlayableSongUrl(autoPlaySong), true);
             }
         })();
@@ -1602,7 +1603,7 @@ export class ServerQueue {
 
         for (let attempt = 1; attempt <= AUTOPLAY_RESOLVE_ATTEMPTS; attempt++) {
             try {
-                const song = await resolveAutoplayCandidate(this.client, currentSong.song, [
+                const song = await this.engine.resolveRelatedSong(currentSong.song, [
                     ...this._autoplayHistory,
                     ...rejectedSongs,
                 ]);
@@ -1623,7 +1624,7 @@ export class ServerQueue {
             } catch (error) {
                 this.client.logger.debug("[ServerQueue] Auto-play resolve failed", {
                     guild: this.textChannel.guild.id,
-                    source: "youtube",
+                    source: this.engine.mode,
                     title: currentSong.song.title,
                     attempt,
                     error: error instanceof Error ? (error.stack ?? error.message) : String(error),

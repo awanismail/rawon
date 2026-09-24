@@ -63,6 +63,55 @@ export function checkQuery(string: string): QueryData {
         } else {
             result.type = "unknown";
         }
+    } else if (/deezer|dzr/gu.test(url.hostname)) {
+        result.sourceType = "deezer";
+
+        const pathSegments = url.pathname.split("/").filter(Boolean);
+        if (pathSegments.includes("playlist") || pathSegments.includes("album")) {
+            result.type = "playlist";
+        } else if (pathSegments.includes("track")) {
+            result.type = "track";
+        } else if (pathSegments.includes("artist")) {
+            result.type = "artist";
+        } else {
+            result.type = "track";
+        }
+    } else if (/music\.apple\.com/gu.test(url.hostname)) {
+        result.sourceType = "applemusic";
+
+        const pathSegments = url.pathname.split("/").filter(Boolean);
+        if (pathSegments.includes("playlist") || pathSegments.includes("album")) {
+            result.type = "playlist";
+        } else {
+            result.type = "track";
+        }
+    } else if (/tidal\.com/gu.test(url.hostname)) {
+        result.sourceType = "tidal";
+
+        const pathSegments = url.pathname.split("/").filter(Boolean);
+        if (pathSegments.includes("playlist") || pathSegments.includes("album")) {
+            result.type = "playlist";
+        } else {
+            result.type = "track";
+        }
+    } else if (/qobuz\.com/gu.test(url.hostname)) {
+        result.sourceType = "qobuz";
+
+        const pathSegments = url.pathname.split("/").filter(Boolean);
+        if (pathSegments.includes("playlist") || pathSegments.includes("album")) {
+            result.type = "playlist";
+        } else {
+            result.type = "track";
+        }
+    } else if (/jiosaavn\.com/gu.test(url.hostname)) {
+        result.sourceType = "jiosaavn";
+
+        const pathSegments = url.pathname.split("/").filter(Boolean);
+        if (pathSegments.includes("playlist") || pathSegments.includes("album")) {
+            result.type = "playlist";
+        } else {
+            result.type = "track";
+        }
     } else {
         result.sourceType = "unknown";
         result.type = "unknown";

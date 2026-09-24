@@ -241,7 +241,8 @@
                 "slashStateFilterDescription": "歌曲過濾器將會 {state, select, enable {啟用} other {停用}}",
                 "slashStatusDescription": "檢查歌曲過濾器的當前狀態",
                 "slashStatusFilterDescription": "您要檢查的歌曲過濾器",
-                "specifyFilter": "請指定歌曲過濾器。"
+                "specifyFilter": "請指定歌曲過濾器。",
+                "notAvailableInMode": "⚠️ **|** Filter {filter} is not available in musicify mode."
             },
             "lyrics": {
                 "description": "顯示歌曲的歌詞",
@@ -274,7 +275,9 @@
                 "description": "播放一些音樂",
                 "noSongData": "該 URL 沒有任何歌曲數據。",
                 "slashQueryDescription": "查詢搜索",
-                "usage": "{prefix}play <查詢 | url>"
+                "usage": "{prefix}play <查詢 | url>",
+                "youtubeNotSupportedMode": "❌ **|** youtube.com links are not supported in musicify mode. Use YouTube Music (music.youtube.com) links instead.",
+                "pluginSourceUnavailable": "❌ **|** {platform} links can only be played in musicify mode (Lavalink). Switch the engine mode or use another source."
             },
             "queue": {
                 "description": "顯示隊列列表"
@@ -390,6 +393,19 @@
                 "slashStatusDescription": "顯示目前點播頻道",
                 "slashChannelDescription": "要設定為點播頻道的頻道",
                 "usage": "{prefix}requestchannel <set | remove | status> [channel]"
+            },
+            "chatplay": {
+                "description": "Set up or manage ChatPlay (song request channel) for this server",
+                "usage": "{prefix}chatplay set <channel> [chat|command] [smartfilter on/off] [autodelete on/off] [slowmode on/off] [pin on/off] | remove | status",
+                "slashSetDescription": "Set the ChatPlay channel for this server",
+                "slashChannelDescription": "The channel to use for ChatPlay",
+                "slashModeDescription": "How requests are accepted: chat messages or commands only",
+                "slashSmartFilterDescription": "Reject chat-only messages with the smart filter",
+                "slashAutoDeleteDescription": "Delete user song requests shortly after processing",
+                "slashSlowmodeDescription": "Enable slowmode on the ChatPlay channel",
+                "slashPinDescription": "Pin the player message in the channel",
+                "slashRemoveDescription": "Remove the ChatPlay channel",
+                "slashStatusDescription": "Show the current ChatPlay configuration"
             }
         }
     },
@@ -464,7 +480,17 @@
         "skippedReasonUnavailable": "私人/已刪除或無法使用",
         "skippedReasonUnresolved": "無法匹配到可播放歌曲",
         "skippedReasonSkipped": "重複、私人/已刪除或無法使用",
-        "resolvingSong": "正在解析歌曲，請稍候…"
+        "resolvingSong": "正在解析歌曲，請稍候…",
+        "filteredChat": "💬 **|** That message looks like chat, not a song request — send a song title or link, or use a command.",
+        "suggestions": "Suggested songs",
+        "modeLabel": "Request mode",
+        "modeChat": "Chat",
+        "modeCommand": "Command only",
+        "smartFilter": "Smart filter",
+        "autoDelete": "Auto-delete requests",
+        "slowmode": "Slowmode",
+        "pinPlayer": "Pin player",
+        "rateLimited": "⏳ **|** You are requesting songs too quickly. Please wait a moment and try again."
     },
     "reusable": {
         "invalidUsage": "無效的用法，請用 {prefix} {name}了解更多資訊。",

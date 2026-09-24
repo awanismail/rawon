@@ -4,6 +4,7 @@ import process from "node:process";
 import { type Command, container, SapphireClient } from "@sapphire/framework";
 import { PinoLogger } from "@stegripe/pino-logger";
 import {
+    Client,
     type ClientOptions,
     Collection,
     type DMChannel,
@@ -16,8 +17,10 @@ import {
     type VoiceState,
 } from "discord.js";
 import got from "got";
+import { type Riffy } from "riffy";
 import * as config from "../config/index.js";
 import { type GuildData } from "../typings/index.js";
+import { initRiffy } from "../utils/engines/lavalink/index.js";
 import { resolveAndApplyMusicCommandTarget } from "../utils/functions/musicCommandTarget.js";
 import { AudioCacheManager } from "../utils/structures/AudioCacheManager.js";
 import { ClientUtils } from "../utils/structures/ClientUtils.js";
@@ -216,6 +219,8 @@ export class Rawon extends SapphireClient {
     public readonly cookies = new CookiesManager(this);
     public readonly multiBotManager = MultiBotManager.getInstance();
     public readonly commands = new CommandsCompatibility(this);
+    /** Klien Lavalink (riffy) — hanya dibuat saat ENGINE_MODE=musicify. */
+    public readonly riffy: Riffy | null = config.engineMode === "musicify" ? initRiffy(this) : null;
     public readonly request = got.extend({
         timeout: { request: 15_000 },
         hooks: {
@@ -277,6 +282,34 @@ export class Rawon extends SapphireClient {
         container.request = this.request;
     }
 
+    /**
+     * Replicates `SapphireClient.login()` (path registration + store loading) so the
+     * `CoreReady` piece can be neutralized after `loadAll()` and before the websocket
+     * connects — the only window where the patch targets the instance that will actually
+     * fire. `super.login()` cannot be used because it would run `loadAll()` a second
+     * time and discard that patch. No Sapphire plugins are registered in this project,
+     * so the skipped plugin hooks are unused.
+     */
+    public override async login(token?: string): Promise<string> {
+        if (this.options.baseUserDirectory !== null) {
+            this.stores.registerPath(this.options.baseUserDirectory);
+        }
+        await Promise.all([...this.stores.values()].map((store) => store.loadAll()));
+
+        if (this.config.isMultiBot) {
+            const coreReady = this.stores.get("listeners").get("CoreReady");
+            if (coreReady) {
+                (coreReady as { run: () => void }).run = () => {};
+                container.logger.info(
+                    "[MultiBot] CoreReady automatic application command registration disabled " +
+                        "(manual per-bot registration runs on clientReady)",
+                );
+            }
+        }
+
+        return Client.prototype.login.call(this, token);
+    }
+
     public build: (token?: string) => Promise<this> = async (token?: string) => {
         this.startTimestamp = Date.now();
         setCookiesManager(this.cookies);
@@ -287,18 +320,6 @@ export class Rawon extends SapphireClient {
             container.logger.debug(`[Rawon] Cookie init in ${Date.now() - cookiesStart}ms`);
         } catch (err) {
             container.logger.warn("[Rawon] Cookie initialization failed (non-fatal):", err);
-        }
-
-        if (this.config.isMultiBot) {
-            const listenerStore = this.stores.get("listeners");
-            const coreReady = listenerStore.get("CoreReady");
-            if (coreReady) {
-                (coreReady as { run: () => void }).run = () => {
-                    container.logger.debug(
-                        "[MultiBot] Skipped CoreReady listener to prevent application command registration errors",
-                    );
-                };
-            }
         }
 
         const loginToken = token ?? process.env.DISCORD_TOKEN;

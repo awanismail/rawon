@@ -60,10 +60,37 @@ export class SQLiteDataManager<T extends Record<string, GuildData> = Record<stri
                 bot_id TEXT NOT NULL,
                 channel_id TEXT,
                 message_id TEXT,
+                mode TEXT NOT NULL DEFAULT 'chat',
+                smart_filter INTEGER NOT NULL DEFAULT 0,
+                auto_delete INTEGER NOT NULL DEFAULT 0,
+                slowmode INTEGER NOT NULL DEFAULT 0,
+                pin_player INTEGER NOT NULL DEFAULT 0,
                 PRIMARY KEY (guild_id, bot_id),
                 FOREIGN KEY (guild_id) REFERENCES guilds(guild_id) ON DELETE CASCADE
             )
         `);
+
+        // Migrasi tabel request_channels lama: tambah kolom opsi ChatPlay.
+        // Default `chat` mempertahankan perilaku request channel rawon
+        // (pesan teks sudah menjadi permintaan lagu).
+        const requestChannelInfo = this.db
+            .prepare("PRAGMA table_info(request_channels)")
+            .all() as Array<{
+            name: string;
+        }>;
+        const requestChannelColumns = new Set(requestChannelInfo.map((col) => col.name));
+        const chatPlayColumns: [string, string][] = [
+            ["mode", "TEXT NOT NULL DEFAULT 'chat'"],
+            ["smart_filter", "INTEGER NOT NULL DEFAULT 0"],
+            ["auto_delete", "INTEGER NOT NULL DEFAULT 0"],
+            ["slowmode", "INTEGER NOT NULL DEFAULT 0"],
+            ["pin_player", "INTEGER NOT NULL DEFAULT 0"],
+        ];
+        for (const [column, definition] of chatPlayColumns) {
+            if (!requestChannelColumns.has(column)) {
+                this.db.exec(`ALTER TABLE request_channels ADD COLUMN ${column} ${definition};`);
+            }
+        }
 
         this.db.exec(`
             CREATE TABLE IF NOT EXISTS player_states (
@@ -590,7 +617,15 @@ export class SQLiteDataManager<T extends Record<string, GuildData> = Record<stri
     public getRequestChannel(
         guildId: string,
         botId: string,
-    ): { channelId: string | null; messageId: string | null } | null {
+    ): {
+        channelId: string | null;
+        messageId: string | null;
+        mode?: "chat" | "command";
+        smartFilter?: boolean;
+        autoDelete?: boolean;
+        slowmode?: boolean;
+        pinPlayer?: boolean;
+    } | null {
         const stmt = this.db.prepare(
             "SELECT * FROM request_channels WHERE guild_id = ? AND bot_id = ?",
         );
@@ -598,6 +633,11 @@ export class SQLiteDataManager<T extends Record<string, GuildData> = Record<stri
             | {
                   channel_id: string | null;
                   message_id: string | null;
+                  mode?: string | null;
+                  smart_filter?: number | null;
+                  auto_delete?: number | null;
+                  slowmode?: number | null;
+                  pin_player?: number | null;
               }
             | undefined;
 
@@ -608,6 +648,11 @@ export class SQLiteDataManager<T extends Record<string, GuildData> = Record<stri
         return {
             channelId: row.channel_id,
             messageId: row.message_id,
+            mode: row.mode === "command" ? "command" : "chat",
+            smartFilter: (row.smart_filter ?? 0) === 1,
+            autoDelete: (row.auto_delete ?? 0) === 1,
+            slowmode: (row.slowmode ?? 0) === 1,
+            pinPlayer: (row.pin_player ?? 0) === 1,
         };
     }
 
@@ -616,6 +661,13 @@ export class SQLiteDataManager<T extends Record<string, GuildData> = Record<stri
         botId: string,
         channelId: string | null,
         messageId: string | null,
+        options?: {
+            mode?: "chat" | "command";
+            smartFilter?: boolean;
+            autoDelete?: boolean;
+            slowmode?: boolean;
+            pinPlayer?: boolean;
+        },
     ): Promise<void> {
         await this.manager.add(async () => {
             const guildStmt = this.db.prepare(`
@@ -625,14 +677,36 @@ export class SQLiteDataManager<T extends Record<string, GuildData> = Record<stri
             `);
             guildStmt.run(guildId, null, 0, null, null);
 
+            const current = this.getRequestChannel(guildId, botId) ?? {};
+            const merged = { ...current, ...options };
+            const toInt = (value: boolean | undefined): number => (value === true ? 1 : 0);
+
             const stmt = this.db.prepare(`
-                INSERT INTO request_channels (guild_id, bot_id, channel_id, message_id)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO request_channels (
+                    guild_id, bot_id, channel_id, message_id,
+                    mode, smart_filter, auto_delete, slowmode, pin_player
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(guild_id, bot_id) DO UPDATE SET
                     channel_id = excluded.channel_id,
-                    message_id = excluded.message_id
+                    message_id = excluded.message_id,
+                    mode = excluded.mode,
+                    smart_filter = excluded.smart_filter,
+                    auto_delete = excluded.auto_delete,
+                    slowmode = excluded.slowmode,
+                    pin_player = excluded.pin_player
             `);
-            stmt.run(guildId, botId, channelId, messageId);
+            stmt.run(
+                guildId,
+                botId,
+                channelId,
+                messageId,
+                merged.mode === "command" ? "command" : "chat",
+                toInt(merged.smartFilter),
+                toInt(merged.autoDelete),
+                toInt(merged.slowmode),
+                toInt(merged.pinPlayer),
+            );
         });
     }
 

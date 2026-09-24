@@ -1,5 +1,4 @@
 import { setTimeout } from "node:timers";
-import { type AudioPlayerPlayingState } from "@discordjs/voice";
 import { ApplyOptions } from "@sapphire/decorators";
 import { type Command, Events, Listener, type ListenerOptions } from "@sapphire/framework";
 import {
@@ -19,12 +18,13 @@ import {
     PermissionsBitField,
     type PermissionsString,
     type Snowflake,
+    type StringSelectMenuInteraction,
     type TextChannel,
 } from "discord.js";
 import { CommandContext } from "../structures/CommandContext.js";
 import { type Rawon } from "../structures/Rawon.js";
 import { type ServerQueue } from "../structures/ServerQueue.js";
-import { type LoopMode, type LyricsAPIResult, type QueueSong } from "../typings/index.js";
+import { type LoopMode, type LyricsAPIResult } from "../typings/index.js";
 import { chunk } from "../utils/functions/chunk.js";
 import { createEmbed } from "../utils/functions/createEmbed.js";
 import { formatMarkdownLink, formatMarkdownText } from "../utils/functions/formatMarkdown.js";
@@ -188,6 +188,11 @@ export class InteractionCreateListener extends Listener<typeof Events.Interactio
             : interaction.guild;
 
         const __mf = i18n__mf(client, thisBotGuildForContext);
+
+        if (interaction.isStringSelectMenu() && interaction.customId === "RC_SONG_SUGGESTION") {
+            await this.handleSongSuggestionSelect(interaction);
+            return;
+        }
 
         if (interaction.isButton()) {
             if (interaction.customId.startsWith("RC_")) {
@@ -727,7 +732,7 @@ export class InteractionCreateListener extends Listener<typeof Events.Interactio
             return;
         }
 
-        const queueVoiceChannelId = queue?.connection?.joinConfig.channelId ?? null;
+        const queueVoiceChannelId = queue?.voiceChannelId ?? null;
         if (queueVoiceChannelId && queueVoiceChannelId !== voiceChannel.id) {
             await interaction.reply({
                 flags: MessageFlags.Ephemeral,
@@ -964,6 +969,10 @@ export class InteractionCreateListener extends Listener<typeof Events.Interactio
                 name: "volume",
                 args: [String(currentVolume + 10)],
             },
+            RC_QUEUE: {
+                name: "queue",
+                args: [],
+            },
         };
 
         if (interaction.customId === "RC_PAUSE_RESUME") {
@@ -994,6 +1003,42 @@ export class InteractionCreateListener extends Listener<typeof Events.Interactio
         return true;
     }
 
+    private async handleSongSuggestionSelect(
+        interaction: StringSelectMenuInteraction,
+    ): Promise<void> {
+        const client = interaction.client as Rawon;
+        const guild = interaction.guild;
+        if (!guild) {
+            await interaction.deferUpdate().catch(() => null);
+            return;
+        }
+
+        const index = Number(interaction.values[0] ?? NaN);
+        const suggestions = client.requestChannelManager.getSuggestions(guild.id);
+        const suggestion = Number.isInteger(index) ? suggestions[index] : undefined;
+
+        if (!suggestion) {
+            await interaction.deferUpdate().catch(() => null);
+            return;
+        }
+
+        const command = client.commands.get("play") as
+            | { contextRun?: (ctx: CommandContext) => unknown }
+            | undefined;
+        if (!command?.contextRun) {
+            await interaction.deferUpdate().catch(() => null);
+            return;
+        }
+
+        const ctx = new CommandContext(interaction, [suggestion.url]);
+        ctx.guild = guild;
+        ctx.additionalArgs.set("ephemeralRequestChannel", true);
+        ctx.additionalArgs.set("fromRequestChannelButton", true);
+
+        await command.contextRun(ctx);
+        await interaction.deferUpdate().catch(() => null);
+    }
+
     private async handleLyricsButton(
         interaction: ButtonInteraction,
         queue: ServerQueue | undefined,
@@ -1011,11 +1056,7 @@ export class InteractionCreateListener extends Listener<typeof Events.Interactio
             return;
         }
 
-        const currentSong = (
-            queue.player.state as
-                | (AudioPlayerPlayingState & { resource?: { metadata?: QueueSong } })
-                | undefined
-        )?.resource?.metadata;
+        const currentSong = queue.getCurrentSong();
 
         if (!currentSong) {
             await interaction.reply({

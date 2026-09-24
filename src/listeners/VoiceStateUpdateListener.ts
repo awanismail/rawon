@@ -1,11 +1,4 @@
 import { clearTimeout, setTimeout } from "node:timers";
-import {
-    type AudioPlayerPausedState,
-    type AudioPlayerPlayingState,
-    AudioPlayerStatus,
-    entersState,
-    VoiceConnectionStatus,
-} from "@discordjs/voice";
 import { ApplyOptions } from "@sapphire/decorators";
 import { Events, Listener, type ListenerOptions } from "@sapphire/framework";
 import {
@@ -97,9 +90,10 @@ export class VoiceStateUpdateListener extends Listener<typeof Events.VoiceStateU
         const oldVc = oldState.channel;
         const newId = newVc?.id;
         const oldId = oldVc?.id;
-        const queueVc = thisBotGuild.channels.cache.get(
-            queue.connection?.joinConfig.channelId ?? "",
-        ) as StageChannel | VoiceChannel | undefined;
+        const queueVc = thisBotGuild.channels.cache.get(queue.voiceChannelId ?? "") as
+            | StageChannel
+            | VoiceChannel
+            | undefined;
 
         if (!queueVc) {
             return;
@@ -223,14 +217,9 @@ export class VoiceStateUpdateListener extends Listener<typeof Events.VoiceStateU
                     ],
                 });
 
-                queue.connection?.configureNetworking();
+                const recovered = await queue.engine.recoverConnection();
 
-                try {
-                    await entersState(
-                        queue.connection as NonNullable<typeof queue.connection>,
-                        VoiceConnectionStatus.Ready,
-                        20_000,
-                    );
+                if (recovered) {
                     void msg.edit({
                         embeds: [
                             createEmbed(
@@ -245,7 +234,7 @@ export class VoiceStateUpdateListener extends Listener<typeof Events.VoiceStateU
                             void msg.delete().catch(() => null);
                         }, 10_000);
                     }
-                } catch {
+                } else {
                     await queue.destroy();
                     this.container.logger.info(
                         `${
@@ -347,16 +336,12 @@ export class VoiceStateUpdateListener extends Listener<typeof Events.VoiceStateU
     }
 
     private getCurrentQueueSong(queue: ServerQueue): QueueSong | null {
-        const playerState = queue.player.state;
-        if (
-            playerState.status !== AudioPlayerStatus.Playing &&
-            playerState.status !== AudioPlayerStatus.Paused
-        ) {
+        const status = queue.engine.getStatus();
+        if (status !== "playing" && status !== "paused") {
             return null;
         }
 
-        return (playerState as AudioPlayerPlayingState | AudioPlayerPausedState).resource
-            .metadata as QueueSong;
+        return queue.engine.getCurrentTrack();
     }
 
     private async handleRequesterAvailabilityChange(
@@ -404,7 +389,7 @@ export class VoiceStateUpdateListener extends Listener<typeof Events.VoiceStateU
             return;
         }
 
-        if (queue.player.state.status !== AudioPlayerStatus.Playing) {
+        if (!queue.playing) {
             return;
         }
 
@@ -429,7 +414,7 @@ export class VoiceStateUpdateListener extends Listener<typeof Events.VoiceStateU
             reason,
             timeout,
         });
-        queue.player.pause();
+        queue.engine.pause();
 
         const __mf = i18n__mf(queue.client, guild);
         const duration = formatMS(timeoutMs);
@@ -477,13 +462,12 @@ export class VoiceStateUpdateListener extends Listener<typeof Events.VoiceStateU
             pending.reason === "left"
                 ? "events.voiceStateUpdate.resumeRequesterLeft"
                 : "events.voiceStateUpdate.resumeRequesterDeaf";
-        const shouldResumePlayer =
-            queue.timeout === null && queue.player.state.status === AudioPlayerStatus.Paused;
+        const shouldResumePlayer = queue.timeout === null && queue.isPaused;
         if (!shouldResumePlayer) {
             return;
         }
 
-        queue.player.unpause();
+        queue.engine.resume();
 
         const __mf = i18n__mf(queue.client, guild);
         await this.sendVoiceStateMessage(
@@ -521,7 +505,7 @@ export class VoiceStateUpdateListener extends Listener<typeof Events.VoiceStateU
             return;
         }
 
-        const queueVc = guild.channels.cache.get(queue.connection?.joinConfig.channelId ?? "") as
+        const queueVc = guild.channels.cache.get(queue.voiceChannelId ?? "") as
             | StageChannel
             | VoiceChannel
             | undefined;
@@ -533,8 +517,8 @@ export class VoiceStateUpdateListener extends Listener<typeof Events.VoiceStateU
 
         if (requesterCanListen) {
             queue.clearRequesterDeafTimeout();
-            if (queue.timeout === null && queue.player.state.status === AudioPlayerStatus.Paused) {
-                queue.player.unpause();
+            if (queue.timeout === null && queue.isPaused) {
+                queue.engine.resume();
             }
             return;
         }
@@ -573,7 +557,7 @@ export class VoiceStateUpdateListener extends Listener<typeof Events.VoiceStateU
             return;
         }
 
-        queue.player.stop(true);
+        queue.stopCurrent();
     }
 
     private async sendVoiceStateMessage(
@@ -623,13 +607,13 @@ export class VoiceStateUpdateListener extends Listener<typeof Events.VoiceStateU
         const __mf = i18n__mf(client, guild);
 
         if (client.data.botSettings.alwaysOn) {
-            queue.player.pause();
+            queue.engine.pause();
             return;
         }
 
         clearTimeout(queue.timeout ?? undefined);
         (guild.queue as ServerQueue).timeout = null;
-        queue.player.pause();
+        queue.engine.pause();
 
         const timeout = 60_000;
         const duration = formatMS(timeout);
@@ -704,7 +688,7 @@ export class VoiceStateUpdateListener extends Listener<typeof Events.VoiceStateU
         const __mf = i18n__mf(client, guild);
 
         if (client.data.botSettings.alwaysOn) {
-            queue.player.pause();
+            queue.engine.pause();
             return;
         }
 
@@ -715,8 +699,7 @@ export class VoiceStateUpdateListener extends Listener<typeof Events.VoiceStateU
             return;
         }
 
-        const song = ((queue.player.state as AudioPlayerPausedState).resource.metadata as QueueSong)
-            .song;
+        const song = (queue.engine.getCurrentTrack() as QueueSong).song;
         const isRequestChannel = queue.client.requestChannelManager.isRequestChannel(
             guild,
             queue.textChannel.id,
@@ -745,6 +728,6 @@ export class VoiceStateUpdateListener extends Listener<typeof Events.VoiceStateU
                 }, 60_000);
             }
         })();
-        guild.queue?.player.unpause();
+        guild.queue?.engine.resume();
     }
 }
