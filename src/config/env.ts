@@ -99,4 +99,15 @@ export const devtoolsHost = /^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$/u.test(rawDevtools
 
 export const debugMode = process.env.DEBUG_MODE?.toLowerCase() === "yes";
 
-export const stegripeApiUrl = "https://api.stegripe.org";
+function trimTrailingSlash(url: string): string {
+    return url.replace(/\/+$/, "");
+}
+
+export const stegripeApiUrl = trimTrailingSlash(process.env.STEGRIPE_API_URL?.trim() ?? "");
+export const cdnBaseUrl = trimTrailingSlash(process.env.CDN_BASE_URL?.trim() ?? "");
+export const hasteUrl = trimTrailingSlash(process.env.HASTE_URL?.trim() ?? "");
+
+export function cdnAsset(path: string): string {
+    const normalized = path.startsWith("/") ? path : `/${path}`;
+    return `${cdnBaseUrl}${normalized}`;
+}
