@@ -91,6 +91,12 @@ const rawDevtoolsPort = Number(process.env.DEVTOOLS_PORT);
 export const devtoolsPort =
     Number.isFinite(rawDevtoolsPort) && rawDevtoolsPort > 0 ? rawDevtoolsPort : 3000;
 
+const rawDevtoolsHost = process.env.DEVTOOLS_HOST?.trim().toLowerCase() ?? "";
+// hostname / IPv4 only — no scheme, port, or IPv6 brackets
+export const devtoolsHost = /^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$/u.test(rawDevtoolsHost)
+    ? rawDevtoolsHost
+    : "127.0.0.1";
+
 export const debugMode = process.env.DEBUG_MODE?.toLowerCase() === "yes";
 
 export const stegripeApiUrl = "https://api.stegripe.org";

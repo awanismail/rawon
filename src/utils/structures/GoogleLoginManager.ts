@@ -81,6 +81,7 @@ export class GoogleLoginManager {
     private readonly paths: BrowserPaths;
     private readonly chromiumPath: string | null;
     private readonly devtoolsPort: number;
+    private readonly devtoolsHost: string;
     private readonly db: Database.Database;
     private actualPort: number | null = null;
     private chromeProcess: ChildProcess | null = null;
@@ -90,7 +91,7 @@ export class GoogleLoginManager {
     private proxyServer: Server | null = null;
     private visitorData: string | null = null;
 
-    public constructor(chromiumPath?: string, devtoolsPort = 3000) {
+    public constructor(chromiumPath?: string, devtoolsPort = 3000, devtoolsHost = "127.0.0.1") {
         const cacheDir = path.resolve(process.cwd(), "cache");
 
         this.paths = {
@@ -101,6 +102,14 @@ export class GoogleLoginManager {
 
         this.chromiumPath = chromiumPath ?? null;
         this.devtoolsPort = devtoolsPort;
+        this.devtoolsHost = devtoolsHost;
+
+        if (this.devtoolsHost !== "127.0.0.1" && this.devtoolsHost !== "localhost") {
+            container.logger.warn(
+                `[GoogleLogin] DEVTOOLS_HOST="${this.devtoolsHost}" — DevTools proxy has no authentication. ` +
+                    "Restrict access with a firewall or SSH tunnel.",
+            );
+        }
 
         this.ensureDirectories();
         this.db = new Database(this.paths.dbPath);
@@ -828,12 +837,12 @@ export class GoogleLoginManager {
     }
 
     private async buildInspectUrl(): Promise<string | null> {
-        const host = "127.0.0.1";
         const port = this.actualPort ?? this.devtoolsPort;
+        const host = this.devtoolsHost;
 
         for (let attempt = 0; attempt < 3; attempt++) {
             try {
-                const response = await fetch(`http://${host}:${port}/json`);
+                const response = await fetch(`${this.getLocalBaseUrl()}/json`);
                 const pages = (await response.json()) as Array<{
                     devtoolsFrontendUrl?: string;
                     webSocketDebuggerUrl?: string;
@@ -853,8 +862,16 @@ export class GoogleLoginManager {
         return null;
     }
 
-    public getDevtoolsBaseUrl(): string {
+    private getDisplayBaseUrl(): string {
+        return `http://${this.devtoolsHost}:${this.actualPort ?? this.devtoolsPort}`;
+    }
+
+    private getLocalBaseUrl(): string {
         return `http://127.0.0.1:${this.actualPort ?? this.devtoolsPort}`;
+    }
+
+    public getDevtoolsBaseUrl(): string {
+        return this.getDisplayBaseUrl();
     }
 
     public async startLoginSession(): Promise<boolean> {
@@ -952,12 +969,10 @@ export class GoogleLoginManager {
     }
 
     private async navigateToLoginPage(): Promise<void> {
-        const port = this.actualPort ?? this.devtoolsPort;
-        const host = "127.0.0.1";
         const loginUrl =
             "https://accounts.google.com/ServiceLogin?continue=https%3A%2F%2Fwww.youtube.com%2F&service=youtube";
 
-        const listResponse = await fetch(`http://${host}:${port}/json`);
+        const listResponse = await fetch(`${this.getLocalBaseUrl()}/json`);
         const existingTargets = (await listResponse.json()) as Array<{
             id: string;
             url: string;
@@ -1009,7 +1024,7 @@ export class GoogleLoginManager {
             });
         }
 
-        const updatedResponse = await fetch(`http://${host}:${port}/json`);
+        const updatedResponse = await fetch(`${this.getLocalBaseUrl()}/json`);
         const targets = (await updatedResponse.json()) as Array<{
             id: string;
             url: string;
@@ -1020,7 +1035,7 @@ export class GoogleLoginManager {
         for (const target of existingTargets) {
             if (target.url === "about:blank" && target.id !== this.loginTargetId) {
                 try {
-                    await fetch(`http://${host}:${port}/json/close/${target.id}`);
+                    await fetch(`${this.getLocalBaseUrl()}/json/close/${target.id}`);
                 } catch {}
             }
         }
@@ -1029,7 +1044,9 @@ export class GoogleLoginManager {
             throw new Error("Could not determine login page target ID");
         }
 
-        this.inspectUrl = `http://${host}:${port}/devtools/inspector.html?ws=${host}:${port}/devtools/page/${this.loginTargetId}`;
+        const displayHost = this.devtoolsHost;
+        const displayPort = this.actualPort ?? this.devtoolsPort;
+        this.inspectUrl = `http://${displayHost}:${displayPort}/devtools/inspector.html?ws=${displayHost}:${displayPort}/devtools/page/${this.loginTargetId}`;
         this.currentLoginUrl = loginUrl;
     }
 

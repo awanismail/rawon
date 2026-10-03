@@ -3,6 +3,7 @@ import { ApplyOptions } from "@sapphire/decorators";
 import { type Command } from "@sapphire/framework";
 import { type CommandContext, ContextCommand } from "@stegripe/command-context";
 import { type Message, PermissionFlagsBits, type SlashCommandBuilder } from "discord.js";
+import { devtoolsPort } from "../../config/env.js";
 import i18n from "../../config/index.js";
 import { type CommandContext as LocalCommandContext } from "../../structures/CommandContext.js";
 import { type Rawon } from "../../structures/Rawon.js";
@@ -160,7 +161,9 @@ export class LoginCommand extends ContextCommand {
                 });
             } else {
                 const debugUrl = sessionInfo.debugUrl ?? "";
-                const port = debugUrl ? new URL(debugUrl).port || "4000" : "4000";
+                const fallbackTarget = debugUrl
+                    ? new URL(debugUrl).host
+                    : `127.0.0.1:${devtoolsPort}`;
 
                 await statusMsg?.edit({
                     embeds: [
@@ -169,7 +172,7 @@ export class LoginCommand extends ContextCommand {
                             .setDescription(
                                 `${__("commands.developers.login.sessionDescription")}\n\n` +
                                     `${__("commands.developers.login.step1Fallback")}\n` +
-                                    `${__mf("commands.developers.login.step2Fallback", { target: `\`localhost:${port}\`` })}\n` +
+                                    `${__mf("commands.developers.login.step2Fallback", { target: `\`${fallbackTarget}\`` })}\n` +
                                     `${__("commands.developers.login.step3")}\n` +
                                     `${__("commands.developers.login.step4")}\n\n` +
                                     __mf("commands.developers.login.timeLimit", {
